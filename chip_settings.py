@@ -5,8 +5,10 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     """
     This will be rewritten, before I was talking about each layer individually (attention, feed forward, etc)
     Moving toward an attention layer focused process with H, Q, K, V, A similar to DRµGS
-    Support for H, Q, K, V, A below
+    Support for H, Q, K, V, A below, after this initial section for individual layers that I'm still supporting cause it has a good CFG setting
+    """
     
+    """
     Layer count is head_layer + 1
     layer_settings indices range from 0 to head_layer
     layer_settings[last_kv_layer - 1] is the last layer that will influence the preprocessed cache (because of the order this is done)

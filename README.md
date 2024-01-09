@@ -7,7 +7,7 @@ A default configuration is included that should be reliable to use, allowing you
 
 ## What's new:
 
-- Support for H, Q, K, V, A vectors [similar to DRµGS.](https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md) Each vector in each layer can be individually targetted with custom weights or a custom CFG function.
+- Support for H, Q, K, V, A vectors [similar to DRµGS.](https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md) Each vector in each layer can be individually targetted with custom weights or a custom CFG function. See the bottom of `chip_settings.py` to experiment. It should be possible to implement DRµGS now using `cfg_func` on these.
 
 - Custom CFG functions! You can set `cfg_func` on each layer to any function you would like. See `chip_settings.py` for more details and an example of a Repulsor CFG function.
 
@@ -20,7 +20,7 @@ I would like to support other model loaders in the future, but currently you mus
 ## Installation
 
 0. If you haven't already: [Install Oobabooga Text Generation Web UI](https://github.com/oobabooga/text-generation-webui/)
-1. [Download the release](https://github.com/SoylentMithril/BrainHackingChip/archive/refs/tags/0.12.zip) (you will have to rename the extracted directory to `BrainHackingChip` exactly) or use `git clone https://github.com/SoylentMithril/BrainHackingChip.git`. Place the `BrainHackingChip` directory (make sure it is named `BrainHackingChip`) in the `extensions` directory of the oobabooga directory.
+1. [Download the release](https://github.com/SoylentMithril/BrainHackingChip/archive/refs/tags/0.13.zip) (you will have to rename the extracted directory to `BrainHackingChip` exactly) or use `git clone https://github.com/SoylentMithril/BrainHackingChip.git`. Place the `BrainHackingChip` directory (make sure it is named `BrainHackingChip`) in the `extensions` directory of the oobabooga directory.
 2. Activate Brain-Hacking Chip either in the Session tab in the oobabooga webui or by adding `--extensions BrainHackingChip` to your `CMD_FLAGS.txt` in the oobabooga directory.
 3. Switch to the Exllamav2 model loader and load your model in that! Exllamav2 is the only supported model loader!
 

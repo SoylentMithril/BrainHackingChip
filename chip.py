@@ -254,15 +254,16 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
         if states_settings.cfg_func:
             states = states_settings.cfg_func(states, states_settings, hackingchip)
         else:
-            state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
-            state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
-            state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
-            
-            states -= state_neg_steering
+            if hackingchip.prompts.numneg > 0:
+                state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
+                state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
+                state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
+                
+                states -= state_neg_steering
     
     #Hacking chip stuff
     hackingchip = shared.model.generator.model.hackingchip if hasattr(shared.model.generator.model, 'hackingchip') else None
-    chip_settings = hackingchip.settings.attn_settings[self.layer_idx] if hackingchip and hackingchip.prompts.numneg > 0 and hackingchip.settings.attn_settings[self.layer_idx] != None else None
+    chip_settings = hackingchip.settings.attn_settings[self.layer_idx] if hackingchip and hackingchip.settings.attn_settings[self.layer_idx] != None else None
     
     #Hacking chip stuff
     if chip_settings:
