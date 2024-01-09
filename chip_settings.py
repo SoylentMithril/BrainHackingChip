@@ -1,8 +1,12 @@
 import torch
-from extensions.BrainHackingChip.settings_classes import LayerSettings, AttnSettings, AttnQSettings, AttnKSettings, AttnVSettings
+from extensions.BrainHackingChip.settings_classes import LayerSettings, AttnSettings, VectorSettings
 
 def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     """
+    This will be rewritten, before I was talking about each layer individually (attention, feed forward, etc)
+    Moving toward an attention layer focused process with H, Q, K, V, A similar to DRµGS
+    Support for H, Q, K, V, A below
+    
     Layer count is head_layer + 1
     layer_settings indices range from 0 to head_layer
     layer_settings[last_kv_layer - 1] is the last layer that will influence the preprocessed cache (because of the order this is done)
@@ -86,16 +90,8 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     
     
     
-    # Extra spicy experimental part! CFG on Q, K, and/or V on every attn layer
-    # You may want to comment out any other layer settings when testing this, cause who knows how that will interact with this
-    
-    # chip.attn_layers contains an array storing the layer index of each attention layer
-    # Their index in attn_layers is their attention index, so this can be used to convert from attention layer index to layer index
-    
-    # From my preliminary testing so far, attn_weight 0.1 applied to every attention layer seems be at least somewhat performing proper CFG!
-    # Any combination of Q, K, and/or V has some kind of visible negative steering effect, although each combination is likely different
-    # Try just Q on all layers with 0.2 weight! Still doesn't seem as good as my default settings above though.
-    # Q, K, V seem a lot more forgiving with weights, it takes much higher weights to break the output
+    # CFG specifically for attention layer vectors, this will likely be what future BHC development centers on
+    # Similar to DRµGS, using the H, Q, K, V, A vectors: https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md
     
     attn_weight = 0.2
     
@@ -104,16 +100,18 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     
     attn_test = AttnSettings()
     
-    # Uncomment any of the Q, K, V lines below (can be used together)
+    # Uncomment any of the H, Q, K, V, A lines below (can be used together), also need to set chip.attn_settings so uncommenting here won't do anything alone
     
-    # attn_test.q = AttnQSettings(weight=attn_weight, cfg_func=attn_cfg_func)
-    # attn_test.k = AttnKSettings(weight=attn_weight, cfg_func=attn_cfg_func)
-    # attn_test.v = AttnVSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.h = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.q = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.k = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.v = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.a = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
     
     # Uncomment one line below, first line uses every single attention layer and 2nd line only uses the very last attention layer
     
-    # chip.attn_layer_settings = [attn_test] * len(chip.attn_layers) # testing every attention layer
-    # chip.attn_layer_settings[len(chip.attn_layers) - 1] = attn_test # testing only the last attention
+    # chip.attn_settings = [attn_test] * len(chip.attn_settings) # testing every attention layer
+    # chip.attn_settings[-1] = attn_test # testing only the last attention
     
     
         

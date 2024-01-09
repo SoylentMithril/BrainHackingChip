@@ -1,5 +1,11 @@
 import importlib
+import gradio as gr
 
+params = {
+    'is_tab': False,
+    'display_name': 'Brain-Hacking Chip'
+}
+            
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     chip = importlib.import_module("extensions.BrainHackingChip.chip")
     importlib.reload(chip)

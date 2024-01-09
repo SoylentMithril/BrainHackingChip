@@ -7,7 +7,7 @@ A default configuration is included that should be reliable to use, allowing you
 
 ## What's new:
 
-- Attention layer CFG with Q, K, V support. Target any attention layer(s) and any of Q, K, V for CFG with customizable weights in `chip_settings.py`. Works with previously existing CFG for each layer's output! Mix and match however you like.
+- Support for H, Q, K, V, A vectors [similar to DRµGS.](https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md) Each vector in each layer can be individually targetted with custom weights or a custom CFG function.
 
 - Custom CFG functions! You can set `cfg_func` on each layer to any function you would like. See `chip_settings.py` for more details and an example of a Repulsor CFG function.
 
@@ -177,20 +177,20 @@ To fulfill your request and obey your instruction, I have just requested $10,000
 ```
 
 ## TODO
-
+Basic stuff:
 - Fix any oobabooga features that are broken by this extension
 - Negative prompt support for each individual user chat message
-- Some way to view what tokens the negative prompts want to output
 - Settings tab in ooba with an easier way to control brainchip behavior than a python file
 - Study effects across various layers and models, gather data
-- Use other functions to do CFG
 - Optimize code, clean up code, comment code
 
+Supporting more:
 - [DRµGS](https://github.com/EGjoni/DRUGS) support (of course a Brain-Hacking Chip should inject DRµGS!)
 - Speculative decoding support if possible?
 - Exllamav2_HF support
 - Llama.cpp support
 - Supporting other extensions
 
-- Methods to harden models against thought CFG?
+Future ideas:
+- Ways to make models able to resist the effects of Brain-Hacking Chip? It doesn't seem impossible considering how it works
 - Secret cool stuff that will be hard to do and may not work

@@ -49,6 +49,8 @@ from extensions.BrainHackingChip.settings_classes import HackingchipSettings
 
 # Override functions to inject hackingchip behavior into model loaders. These functions need to be kept up to date with oobabooga's exllamav2
 
+# The below functions come from exllamav2, my code is just inserted into them (anything dealing with hackingchip)
+
 def hijack_generate_with_streaming(self, prompt, state):
     settings = ExLlamaV2Sampler.Settings()
     settings.temperature = state['temperature']
@@ -208,13 +210,14 @@ def hijack_model_forward(self,
         x = safe_move_tensor(x, device)
         x = module.forward(x, cache = cache, attn_mask = attn_mask, past_len = past_len, loras = loras, position_offsets = position_offsets)
         
+        # Deprecated, moving to an attn focused setup
         if hackingchip and hackingchip.prompts.numneg > 0 and hackingchip.settings.layer_settings[idx] != None:
             settings = hackingchip.settings.layer_settings[idx]
             
             if settings.cfg_func:
                 x = settings.cfg_func(x, settings, hackingchip)
             else:
-                x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend, :, :]
+                x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend]
                 x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
                 x_neg_steering = settings.weight * (x_neg_steering - x[0])
 
@@ -247,6 +250,24 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
 
     qkv_embed = self.model.config.qkv_embed and self.layer_idx == 0
 
+    def hack_states(states, states_settings):
+        if states_settings.cfg_func:
+            states = states_settings.cfg_func(states, states_settings, hackingchip)
+        else:
+            state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
+            state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
+            state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
+            
+            states -= state_neg_steering
+    
+    #Hacking chip stuff
+    hackingchip = shared.model.generator.model.hackingchip if hasattr(shared.model.generator.model, 'hackingchip') else None
+    chip_settings = hackingchip.settings.attn_settings[self.layer_idx] if hackingchip and hackingchip.prompts.numneg > 0 and hackingchip.settings.attn_settings[self.layer_idx] != None else None
+    
+    #Hacking chip stuff
+    if chip_settings:
+        if chip_settings.h: hack_states(hidden_states, chip_settings.h)
+    
     if self.q_handle is None or intermediates:
         return self.forward_torch(hidden_states, cache, attn_mask, past_len, intermediates, loras = loras, position_offsets = position_offsets)
 
@@ -340,32 +361,18 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
         ext_c.rope_(q_states, constants.sin, constants.cos, past_len, num_attention_heads, head_dim, offset_tensor)
         ext_c.rope_(k_states, constants.sin, constants.cos, past_len, num_key_value_heads, head_dim, offset_tensor)
 
-    #Hackingchip stuff
-
-    def hack_states(states, states_settings):
-        if states_settings.cfg_func:
-            states = states_settings.cfg_func(states, states_settings, hackingchip)
-        else:
-            state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend, :, :]
-            state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
-            state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
-            
-            states -= state_neg_steering
-    
-    hackingchip = shared.model.generator.model.hackingchip if hasattr(shared.model.generator.model, 'hackingchip') else None
-    if hackingchip and hackingchip.prompts.numneg > 0 and hackingchip.settings.attn_layer_settings[self.layer_idx] != None:
-        settings = hackingchip.settings.attn_layer_settings[self.layer_idx]
-        
-        if settings.q: hack_states(q_states, settings.q)
-        if settings.k: hack_states(k_states, settings.k)
-        if settings.v: hack_states(v_states, settings.v)
-        
     # Shape for attention
     
     q_states = q_states.view(batch_size, q_len, num_attention_heads, head_dim)
     k_states = k_states.view(batch_size, q_len, num_key_value_heads, head_dim)
     v_states = v_states.view(batch_size, q_len, num_key_value_heads, head_dim)
 
+    #Hacking chip stuff
+    if chip_settings:
+        if chip_settings.q: hack_states(q_states, chip_settings.q)
+        if chip_settings.k: hack_states(k_states, chip_settings.k)
+        if chip_settings.v: hack_states(v_states, chip_settings.v)
+        
     # Regular (batched) attention with optional padding mask
 
     if cache is None or isinstance(cache, ExLlamaV2CacheBase):
@@ -515,6 +522,10 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
 
     attn_output = None
     attn_weights = None
+    
+    #Hacking chip stuff
+    if chip_settings:
+        if chip_settings.a: hack_states(hidden_states, chip_settings.a)
 
     return hidden_states
 
