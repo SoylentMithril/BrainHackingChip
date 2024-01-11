@@ -37,9 +37,12 @@ def get_available_files():
     
     subdirectories = ['default']
     
-    for root, dirs, files in os.walk(os.path.join(os.getcwd(), directory_to_search)):
-        if file_to_find in files:
-            subdirectories.append(os.path.basename(root))
+    try:
+        for root, dirs, files in os.walk(os.path.join(os.getcwd(), directory_to_search)):
+            if file_to_find in files:
+                subdirectories.append(os.path.basename(root))
+    except Exception as e:
+        print("Error loading chips")
 
     return subdirectories
 
