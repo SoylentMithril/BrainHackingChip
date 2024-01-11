@@ -1,7 +1,13 @@
 import torch
-from extensions.BrainHackingChip.settings_classes import LayerSettings, AttnSettings, VectorSettings
+from extensions.BrainHackingChip.settings_classes import LayerSettings, AttnSettings, VectorSettings, Value
 
-def brainhackingchip_settings(chip, last_kv_layer, head_layer):
+# These are parameters for the settings tab in the UI
+# The user set values will be passed into the settings function, using the dictionary names from params
+ui_params = {
+  'weight': Value(name="Weight", start=0.2, min=0.0, max=1.0, step=0.05)
+}
+
+def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     """
     This will be rewritten, before I was talking about each layer individually (attention, feed forward, etc)
     Moving toward an attention layer focused process with H, Q, K, V, A similar to DRµGS
@@ -33,6 +39,8 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     For an example of a custom cfg_func, see cfg_repulsor below
     """
     
+    if not 'weight' in params: params['weight'] = 0.2 # Fix for right now when autoload on launch isn't working
+    
     # Repels positive from negative, up to a distance determined by negative's magnitude * settings.weight
     def cfg_repulsor(tensor, settings, hackingchip):
             # Get negative tensor
@@ -57,7 +65,7 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     # The weight of the CFG for thoughts in this example, change this value to change how strongly thoughts are affected by negative prompts
     # The amount of weight to use seems to depend on how many layers you are putting it on
     # It seems like once you accumulate 0.5 weight among all layers or more, things can get weird. The default puts 0.2 weight into two different layers.
-    thought_weight = 0.2
+    thought_weight = params['weight']
     
     chip.layer_settings[last_kv_layer - 1] = LayerSettings(weight=thought_weight, cfg_func=thought_cfg_func)
     chip.layer_settings[last_kv_layer + 1] = LayerSettings(weight=thought_weight, cfg_func=thought_cfg_func)
@@ -76,18 +84,6 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     
 
     
-    # Extra options:
-    
-    # The On/Off button for the hackingchip, you can turn it off easily for debugging
-    chip.on = True # If this isn't set, the default is True
-    
-    # All the generated prompts will be printed to the console
-    chip.output_prompts = False # If this isn't set, the default is False
-    
-    # The output of each extra prompt will be printed to the console after generation completes
-    chip.output_extra_samples = False # If this isn't set, the default is False
-    
-    
     
     
     
@@ -95,7 +91,7 @@ def brainhackingchip_settings(chip, last_kv_layer, head_layer):
     # CFG specifically for attention layer vectors, this will likely be what future BHC development centers on
     # Similar to DRµGS, using the H, Q, K, V, A vectors: https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md
     
-    attn_weight = 0.2
+    attn_weight = params['weight']
     
     # You can do custom cfg_func with Q, K, V as well! It's the exact same function signature (so can use the same function for all if you want)
     attn_cfg_func = None

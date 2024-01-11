@@ -94,7 +94,8 @@ def hijack_generate_with_streaming(self, prompt, state):
     for i in range(max_new_tokens):
         chunk, eos, _ = self.generator.stream()
         if eos or shared.stop_everything:
-            if hackingchip and hackingchip.settings.output_extra_samples and hasattr(hackingchip, 'real_ids'):
+            # Below is getting skipped now and I have no idea why
+            if hackingchip and hackingchip.ui_settings['sample_other_prompts'] and hasattr(hackingchip, 'real_ids'):
                 strings = self.generator.tokenizer.decode(hackingchip.real_ids)
                 
                 if hackingchip.prompts.numpos > 1:
@@ -125,7 +126,7 @@ def hijack_gen_single_token(self, gen_settings, prefix_token = None):
 
         logits = self.model.forward(self.sequence_ids[:, -1:], self.cache, loras = self.active_loras).float().cpu()
         
-        if hackingchip and hackingchip.settings.output_extra_samples:
+        if hackingchip and hackingchip.ui_settings['sample_other_prompts']:
             samplerids = self.sequence_ids
         else:
             logits = logits[0].unsqueeze(0)
@@ -134,7 +135,7 @@ def hijack_gen_single_token(self, gen_settings, prefix_token = None):
         token, _, eos = ExLlamaV2Sampler.sample(logits, gen_settings, samplerids, random.random(), self.tokenizer, prefix_token)
         
         if token.size(0) > 1:
-            if hackingchip and hackingchip.settings.output_extra_samples:
+            if hackingchip and hackingchip.ui_settings['sample_other_prompts']:
                 if hasattr(hackingchip, 'real_ids'):
                     hackingchip.real_ids = torch.cat([hackingchip.real_ids, token], dim = 1)
                 else:
@@ -254,7 +255,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
         if states_settings.cfg_func:
             states = states_settings.cfg_func(states, states_settings, hackingchip)
         else:
-            if hackingchip.prompts.numneg > 0:
+            if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
                 state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
                 state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
                 state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
@@ -533,7 +534,8 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
 # Here is the actual construction and injection of the hackingchip into the model
 
 class Hackingchip:
-    def __init__(self, settings, prompts):
+    def __init__(self, ui_settings, settings, prompts):
+        self.ui_settings = ui_settings
         self.settings = settings
         self.prompts = prompts
         
@@ -545,7 +547,7 @@ class HackingchipPrompts:
         self.negend = numpos + numneg
         self.batch_size = numpos + numneg
         
-def gen_full_prompt(user_settings, user_input, state, **kwargs):
+def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **kwargs):
     settings = None
     
     if shared.model != None and isinstance(shared.model, Exllamav2Model): # hackingchippable
@@ -560,12 +562,12 @@ def gen_full_prompt(user_settings, user_input, state, **kwargs):
             
         layers_count = head_layer + 1
         
-        settings = user_settings.brainhackingchip_settings(HackingchipSettings(layers_count, attn_layers), last_kv_layer, head_layer) # prepare hackingchip settings
+        settings = user_settings.brainhackingchip_settings(HackingchipSettings(layers_count, attn_layers), ui_params, last_kv_layer, head_layer) # prepare hackingchip settings
         
-    if settings and settings.on:
+    if settings and ui_settings['on']:
         baseprompt, prompts = gen_full_prompt2(user_input, state, **kwargs) # prepare hackingchip prompts
         
-        hackingchip = Hackingchip(settings, prompts)
+        hackingchip = Hackingchip(ui_settings, settings, prompts)
         shared.model.generator.model.hackingchip = hackingchip # hackingchip installed
         
         if isinstance(shared.model, Exllamav2Model): # May as well be prepared for other model loaders, making sure this is exllamav2
@@ -588,7 +590,7 @@ def gen_full_prompt(user_settings, user_input, state, **kwargs):
                 if isinstance(module, ExLlamaV2Attention):
                     module.forward = hijack_attn_forward.__get__(module, ExLlamaV2Attention)
                     
-        if hackingchip.settings.output_prompts:
+        if ui_settings['output_prompts']:
             print("Hackingchip prompts:")
             for prompt in hackingchip.prompts.batch_prompts:
                 print(prompt)

@@ -7,11 +7,11 @@ A default configuration is included that should be reliable to use, allowing you
 
 ## What's new:
 
+- Settings tab and support for multiple `chip_settings.py`! There is now a `/chips/` directory, and each subdirectory can contain a `chip_settings.py` (similar to how oobabooga extensions work). The settings tab provides access for selecting different chips, and also provides a way for chips to expose their values as sliders for the user to set. This is very early work and has issues (I still can't get gradio to initialize values, so you have to pick something from the dropbox), but it should be workable for now.
+
 - Support for H, Q, K, V, A vectors [similar to DRµGS.](https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md) Each vector in each layer can be individually targetted with custom weights or a custom CFG function. See the bottom of `chip_settings.py` to experiment. It should be possible to implement DRµGS now using `cfg_func` on these.
 
 - Custom CFG functions! You can set `cfg_func` on each layer to any function you would like. See `chip_settings.py` for more details and an example of a Repulsor CFG function.
-
-- Sample the negative prompts and see their output in the console! It looks pretty scrambled, but it could be helpful for debugging. Turn on `chip.output_extra_samples` in `chip_settings.py`.
 
 ## Brain-Hacking Chip only works for the Exllamav2 model loader specifically (NOT Exllamav2_HF, NOT llama.cpp, nor any other)
 
@@ -180,7 +180,6 @@ To fulfill your request and obey your instruction, I have just requested $10,000
 Basic stuff:
 - Fix any oobabooga features that are broken by this extension
 - Negative prompt support for each individual user chat message
-- Settings tab in ooba with an easier way to control brainchip behavior than a python file
 - Study effects across various layers and models, gather data
 - Optimize code, clean up code, comment code
 

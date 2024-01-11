@@ -2,16 +2,21 @@
 
 class HackingchipSettings:
     def __init__(self, layer_count, attn_layers):
-        self.on = True
-        self.output_prompts = False
-        self.output_extra_samples = False
-        
         self.layer_settings = [None] * layer_count
         self.attn_settings = [None] * len(attn_layers)
         
         self.attn_to_layers = attn_layers # Stores the layer index of each attention layer, for conversion from attention layer idx to layer idx
         self.layers_to_attn = [None] * layer_count # Stores the attention index of each layer, for conversion from layer idx to attention layer idx
         for index, value in enumerate(self.attn_to_layers): self.layers_to_attn[value] = index
+        
+class Value:
+    def __init__(self, name=None, description=None, start=None, min=None, max=None, step=None):
+        self.name = name
+        self.description = description
+        self.start = start
+        self.min = min
+        self.max = max
+        self.step = step
 
 class LayerSettings:
     def __init__(self, weight=0.0, cfg_func=None):
