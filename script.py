@@ -37,7 +37,7 @@ def get_available_files():
     
     subdirectories = ['default']
     
-    for root, dirs, files in os.walk(directory_to_search):
+    for root, dirs, files in os.walk(os.path.join(os.getcwd(), directory_to_search)):
         if file_to_find in files:
             subdirectories.append(os.path.basename(root))
 
