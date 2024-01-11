@@ -67,35 +67,6 @@ def select_file(filename):
     
     return populate_sliders()
 
-def populate_base_sliders():
-    global slider_values, slider_map, sliders
-    mu = shared.args.multi_user
-    
-    slider_values = [0] * len(params)
-    slider_map = [] # reset slider_map
-    sliders = [] # reset sliders
-    count = 0
-
-    if chip_settings and hasattr(chip_settings, 'params'):
-        for key, value in chip_settings.params.items():
-            slider_values[count] = value.start
-            
-            slider_map.append(key)
-            sliders.append(gr.Slider(visible=True, 
-                                     interactive=not mu,
-                                     minimum=value.min if hasattr(value, 'min') else 0.0,
-                                     maximum=value.max if hasattr(value, 'max') else 0.0,
-                                     value=value.start if hasattr(value, 'start') else 0.0,
-                                     step=value.step if hasattr(value, 'step') else 0.0,
-                                     label=value.name if hasattr(value, 'name') else '',
-                                     info=value.description if hasattr(value, 'description') else None
-                                     ))
-            
-            count += 1
-            if count >= max_sliders:
-                count = max_sliders
-                break
-
 def populate_sliders():
     global chip_settings, slider_values, slider_map, sliders
     mu = shared.args.multi_user
