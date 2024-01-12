@@ -19,7 +19,8 @@ def raw_state_setup(self, direct, constants, cache, loras, hidden_states, positi
     k_shape = hidden_states.shape[:-1] + (self.k_proj.out_features,)
     v_shape = hidden_states.shape[:-1] + (self.v_proj.out_features,)
     q_states = torch.empty(q_shape, device = hidden_states.device, dtype = torch.half)
-
+    batch_keys = None
+    batch_values = None
     # If conditions are right we can write the K/V projections directly into the cache
 
     if direct:
@@ -63,4 +64,4 @@ def raw_state_setup(self, direct, constants, cache, loras, hidden_states, positi
                             constants.cos,
                             pass_loras,
                             pass_lora_temp)
-    return q_states, k_states, v_states, pass_loras, pass_lora_temp
+    return batch_keys, batch_values, q_states, k_states, v_states, pass_loras, pass_lora_temp
