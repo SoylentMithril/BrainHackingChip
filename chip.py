@@ -13,38 +13,13 @@ import random
 
 from modules.exllamav2 import Exllamav2Model
 
-from exllamav2.generator import ExLlamaV2Sampler, ExLlamaV2StreamingGenerator
-from exllamav2.cache import ExLlamaV2CacheBase
-from exllamav2.model import _torch_device, ExLlamaV2
-from exllamav2.compat import safe_move_tensor
-from exllamav2 import (
-    ExLlamaV2Cache,
-    ExLlamaV2Cache_8bit,
-)
-from exllamav2.attn import ExLlamaV2Attention
-
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True)
 from functools import partial
 
-from exllamav2 import ext
-from exllamav2.ext import exllamav2_ext as ext_c
 import math
 from torch import nn
 from .util.general_stuff import *
-# Detect flash-attn
-
-has_flash_attn = False
-try:
-    import flash_attn
-    flash_attn_ver = [int(t) for t in flash_attn.__version__.split(".") if t.isdigit()]
-    is_ampere_or_newer_gpu = any(torch.cuda.get_device_properties(i).major >= 8 for i in range(torch.cuda.device_count()))
-    
-    if flash_attn_ver >= [2, 2, 1] and is_ampere_or_newer_gpu:
-        from flash_attn import flash_attn_func
-        has_flash_attn = True
-except ModuleNotFoundError:
-    pass
 
 from extensions.BrainHackingChip.settings_classes import HackingchipSettings
 
