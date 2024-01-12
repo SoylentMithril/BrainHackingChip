@@ -91,8 +91,12 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     # CFG specifically for attention layer vectors, this will likely be what future BHC development centers on
     # Similar to DRµGS, using the H, Q, K, V, A vectors: https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md
     
-    attn_weight = params['weight']
-    
+    attn_weight = 0.2
+    h_theta = 0.0
+    q_theta = 0.0
+    k_theta = 0.0
+    v_theta = 0.2
+    a_theta = 0.2
     # You can do custom cfg_func with Q, K, V as well! It's the exact same function signature (so can use the same function for all if you want)
     attn_cfg_func = None
     
@@ -104,11 +108,11 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     # attn_test.q = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
     # attn_test.k = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
     # attn_test.v = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
-    # attn_test.a = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    attn_test.a = VectorSettings(weight=a_theta, cfg_func=attn_cfg_func)
     
     # Uncomment one line below, first line uses every single attention layer and 2nd line only uses the very last attention layer
     
-    # chip.attn_settings = [attn_test] * len(chip.attn_settings) # testing every attention layer
+    chip.attn_settings = [attn_test] * len(chip.attn_settings) # testing every attention layer
     # chip.attn_settings[-1] = attn_test # testing only the last attention
     
     

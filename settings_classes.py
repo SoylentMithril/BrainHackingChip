@@ -29,10 +29,31 @@ class VectorSettings:
         self.cfg_func = cfg_func
         
 class AttnSettings:
-    def __init__(self, h=None, q=None, k=None, v=None, a=None): # Use VectorSettings
-        self.h = h # VectorSettings for hidden state vectors inputting into attention layer
-        self.q = q # VectorSettings for query vectors
-        self.k = k # VectorSettings for key vector
-        self.v = v # VectorSettings for value vectors
-        self.a = a # VectorSettings for attention output vectors
+    def __init__(self, 
+                 h=None,# VectorSettings provided with hidden state vectors inputting into attention layer
+                 q_in=None,# VectorSettings provided with incoming query vectors
+                 q_inf=None,# Flash_attention version of the above. Just a transpose on dim 1,2 of the above. It is safe to provide
+                 #functions for both of these, only the relevant one will be called.
+                 k_in=None, # VectorSettings provided with just incoming (not yet cached) key vectors. 
+                 k_all=None, # VectorSettings provided with past(cached) + incoming (not yet cached) key vectors. 
+                 k_allf=None, # VectorSettings provided with past(cached) + incoming (not yet cached) key vectors. 
+                 v_in=None, # VectorSettings provided with incoming (not yet cached) value vectors.
+                 v_all=None, # VectorSettings provided with past(cached) + incoming (not yet cached) value vectors.
+                 v_allf=None,  # VectorSettings provided with past(cached) + incoming (not yet cached) value vectors.
+                 a_ho=None, # VectorSettings provided with result of attention * value vectors of each head, prior to concatenation
+                 a_c=None, # VectorSettings provided with concatenation of above, prior to attention output projection
+                 a_po=None): # VectorSettings provided with attention output projection of above, prior to feed forward
+        self.h = h 
+        self.q_in = q_in 
+        self.q_inf = q_inf
+        self.k_in = k_in
+        self.k_all = k_all
+        self.k_allf = k_allf
+        self.v_in = v_in
+        self.v_all = v_all
+        self.v_allf = v_allf
+        self.a_ho = a_ho
+        self.a_c = a_c
+        self.a_po = a_po
+        
         
