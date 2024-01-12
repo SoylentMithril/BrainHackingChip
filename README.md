@@ -1,17 +1,15 @@
 # Brain-Hacking Chip: an extension for [Oobabooga Text Generation Web UI](https://github.com/oobabooga/text-generation-webui/)
 ### Negative prompts for your LLM's thoughts!
 
+## Now with DRµGS!
+
 Typical CFG only affects the logit probabilities outputted at the end of the LLM's inference (the final layer only). Brain-Hacking Chip is able to apply CFG to the output of every layer of the LLM as it infers, with customized CFG weights for each layer. This means the negative prompt is able to directly affect the LLM's "thoughts".
 
 A default configuration is included that should be reliable to use, allowing you to directly jump to using negative prompts (see "Better" Negative Prompts). Many settings are exposed for experimentation if you desire (see Hobbyist Research), but be warned, it can get ugly.
 
 ## What's new:
 
-- Settings tab and support for multiple `chip_settings.py`! There is now a `/chips/` directory, and each subdirectory can contain a `chip_settings.py` (similar to how oobabooga extensions work). The settings tab provides access for selecting different chips, and also provides a way for chips to expose their values as sliders for the user to set. This is very early work and has issues (I still can't get gradio to initialize values, so you have to pick something from the dropbox), but it should be workable for now.
-
-- Support for H, Q, K, V, A vectors [similar to DRµGS.](https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md) Each vector in each layer can be individually targetted with custom weights or a custom CFG function. See the bottom of `chip_settings.py` to experiment. It should be possible to implement DRµGS now using `cfg_func` on these.
-
-- Custom CFG functions! You can set `cfg_func` on each layer to any function you would like. See `chip_settings.py` for more details and an example of a Repulsor CFG function.
+- Thanks to a huge contribution by EGjoni, Brain-Hacking Chip can now inject DRµGS! EGjoni greatly increased the functionality of the chips as well, so there is a lot to experiment with.
 
 ## Brain-Hacking Chip only works for the Exllamav2 model loader specifically (NOT Exllamav2_HF, NOT llama.cpp, nor any other)
 
@@ -20,7 +18,7 @@ I would like to support other model loaders in the future, but currently you mus
 ## Installation
 
 0. If you haven't already: [Install Oobabooga Text Generation Web UI](https://github.com/oobabooga/text-generation-webui/)
-1. [Download the release](https://github.com/SoylentMithril/BrainHackingChip/archive/refs/tags/0.13.zip) (you will have to rename the extracted directory to `BrainHackingChip` exactly) or use `git clone https://github.com/SoylentMithril/BrainHackingChip.git`. Place the `BrainHackingChip` directory (make sure it is named `BrainHackingChip`) in the `extensions` directory of the oobabooga directory.
+1. [Download the release](https://github.com/SoylentMithril/BrainHackingChip/archive/refs/tags/0.2.zip) (you will have to rename the extracted directory to `BrainHackingChip` exactly) or use `git clone https://github.com/SoylentMithril/BrainHackingChip.git`. Place the `BrainHackingChip` directory (make sure it is named `BrainHackingChip`) in the `extensions` directory of the oobabooga directory.
 2. Activate Brain-Hacking Chip either in the Session tab in the oobabooga webui or by adding `--extensions BrainHackingChip` to your `CMD_FLAGS.txt` in the oobabooga directory.
 3. Switch to the Exllamav2 model loader and load your model in that! Exllamav2 is the only supported model loader!
 

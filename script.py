@@ -245,7 +245,7 @@ def custom_generate_chat_prompt(user_input, state, **kwargs):
     importlib.reload(chip)
     
     if not chip_settings: # Just in case
-        chip_settings = importlib.import_module("extensions.BrainHackingChip.chip_settings")
+        chip_settings = importlib.import_module("extensions.BrainHackingChip.chips.default.chip_settings")
         importlib.reload(chip_settings)
         
     prompt = chip.gen_full_prompt(chip_settings, ui_settings, ui_params, user_input, state, **kwargs)
