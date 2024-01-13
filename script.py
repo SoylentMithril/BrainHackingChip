@@ -13,6 +13,7 @@ params = {
 }
 
 gradio = {}
+selected_file = None
 default_max_widgets = 10 # This will probably have to be higher
 default_max_widgets = 10
 chip_path = "extensions.BrainHackingChip.chips.{name}.chip_settings"
@@ -82,7 +83,8 @@ def make_chip_blocks(mu):
     return chip_blocks
 
 def select_file(filename):
-    global chip_settings, active_chip_path, active_chip_ui_path
+    global chip_settings, active_chip_path, active_chip_ui_path, selected_file
+    selected_file = filename
     path = chip_path.format(name=filename)
     try:
         chip_settings = importlib.import_module(path)
@@ -194,7 +196,38 @@ def output_prompts_change(value):
     
 def sample_other_prompts_change(value):
     ui_settings['sample_other_prompts'] = value
+    
+# Using this to pass params into chips in a less verbose way, and can also be used for saving
+def get_widget_params(widgets):
+    params = {}
+    
+    for key, widget in widgets.items():
+        info = {}
         
+        if 'attributes' in widget:
+            if 'value' in widget['attributes']: # will there ever be other things to save?
+                info['value'] = widget['attributes']['value']
+                # print(key + ": " + str(widget['attributes']['value'])) # save widget['attributes']['value']
+            
+        if 'sub_attr' in widget:
+            info['sub'] = get_widget_params(widget['sub_attr'])
+            
+        if len(info) > 0:
+            params[key] = info
+            
+    return params
+
+def get_chip_params():
+    global chip_blocks, gradio
+    
+    params = {}
+    
+    if selected_file and selected_file in chip_blocks:
+        if 'ui_params' in chip_blocks[selected_file]:
+            params = get_widget_params(chip_blocks[selected_file]['ui_params'])
+    
+    return params
+            
 # I'm learning gradio with this function, bear with me here
 def ui():
     global widgets, gradio, chip_settings, chipblocks_list
@@ -229,7 +262,8 @@ def ui():
     
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     global ui_settings, chip_settings
-    ui_params = None # EGjoni already has ui_params in chip_settings being updated, this is deprecated
+    
+    ui_params = get_chip_params()
     
     chip = importlib.import_module("extensions.BrainHackingChip.chip")
     importlib.reload(chip)

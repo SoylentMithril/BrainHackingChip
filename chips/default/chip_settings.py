@@ -40,7 +40,7 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     For an example of a custom cfg_func, see cfg_repulsor below
     """
     
-    weight = ui_params['weight']['attributes']['value']
+    weight = params['weight']['value'] if 'weight' in params and 'value' in params['weight'] else 0.2 # still no autoload so have to be careful here
     
     # Repels positive from negative, up to a distance determined by negative's magnitude * settings.weight
     def cfg_repulsor(tensor, settings, hackingchip):
