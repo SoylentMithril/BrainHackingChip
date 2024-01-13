@@ -2,6 +2,11 @@ import torch
 from extensions.BrainHackingChip.settings_classes import LayerSettings, AttnSettings, VectorSettings, Value
 from .chip_ui import *
 
+from .chip_prompt import gen_full_prompt as gen_full_prompt2
+
+def gen_full_prompt(user_input, state, **kwargs): # This call finds the [[POSITVE]] and [[NEGATIVE]] tags and splits the prompts
+    baseprompt, prompts = gen_full_prompt2(user_input, state, **kwargs) # I'm sure there's a better way to do this, oh well
+    return baseprompt, prompts
 
 def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     """
