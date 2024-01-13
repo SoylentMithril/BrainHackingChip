@@ -167,18 +167,6 @@ def populate_widgets(ui_params, mu, prefix=None):
 
     return editable_elems, widget_keys, widget_values, ui_elems
 
-def get_widget_values():
-    global widget_values, widget_keys
-    
-    values = {}
-    
-    for index, widget_key in enumerate(widget_keys):
-        # This is using the decorated widget_keys, will need a conversion to the user-defined keys in chip_ui
-        # This is also grabbing default values instead of values from the GUI, and it will be interesting to actually get those GUI values
-        values[widget_key] = widget_values[index]
-        
-    return values
-
 def traverse_to(from_obj, path):
     if len(path) == 1 and path[0] in from_obj:
         return from_obj[path[0]]
@@ -241,7 +229,7 @@ def ui():
     
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     global ui_settings, chip_settings
-    ui_params = get_widget_values()
+    ui_params = None # EGjoni already has ui_params in chip_settings being updated, this is deprecated
     
     chip = importlib.import_module("extensions.BrainHackingChip.chip")
     importlib.reload(chip)
