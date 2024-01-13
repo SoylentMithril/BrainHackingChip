@@ -172,8 +172,10 @@ def get_widget_values():
     
     values = {}
     
-    for index, value in enumerate(widget_keys):
-        values[widget_keys[index]] = value
+    for index, widget_key in enumerate(widget_keys):
+        # This is using the decorated widget_keys, will need a conversion to the user-defined keys in chip_ui
+        # This is also grabbing default values instead of values from the GUI, and it will be interesting to actually get those GUI values
+        values[widget_key] = widget_values[index]
         
     return values
 
