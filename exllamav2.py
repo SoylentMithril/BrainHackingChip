@@ -284,7 +284,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
             states = states_settings.cfg_func(states, states_settings, hackingchip, 
                                                   layer_idx=self.layer_idx, 
                                                   dim_info=dim_info, 
-                                                  total_layers=self.model.last_kv_layer_idx,
+                                                  total_layers=len(hackingchip.settings.attn_to_layers), # exllamav2 stores MLP, attn, etc layers each as their own index so its layer counts can't be used for only attention, but just the attention layer count is available through the len of this array, could be stored separately too
                                                   cache=cache)
         else:
             if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
