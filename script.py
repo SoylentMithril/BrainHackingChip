@@ -278,7 +278,7 @@ def ui():
                 gradio['load_settings_button'] = gr.Button("Load Settings", visible=False)
         with gr.Column():
             with gr.Row():
-                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=None, label='Settings File', elem_classes='slim-dropdown', interactive=not mu)  
+                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value="default", label='Settings File', elem_classes='slim-dropdown', interactive=not mu)  
                 create_refresh_button(gradio['file_select'], lambda: None, lambda: {'choices': get_available_files()}, 'refresh-button', interactive=not mu)
             with gr.Row():
                 # Currently not using this, making it invisible for now... Not sure if I want script editing in here or not
@@ -288,8 +288,6 @@ def ui():
         widget_containers_full = make_chip_blocks(mu)
         
     gradio['file_select'].change(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)   
-    # This doesn't trigger the change event... Why? It sets the value in the GUI, but I can't trigger the change event
-    # gradio['file_select'].value = "default"
     
     gradio['on_switch'].change(on_switch_change, gradio['on_switch'])
     gradio['output_prompts'].change(output_prompts_change, gradio['output_prompts'])
@@ -299,6 +297,9 @@ def ui():
     
     # Not sure how to load yet
     gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=chipblocks_list)
+    
+    # Auto-load GUI widgets, will change this to load settings file once that's setup
+    shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
     
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     global ui_settings, chip_settings
