@@ -7,6 +7,8 @@ from modules.ui import create_refresh_button
 import os
 import fnmatch
 
+import json
+
 params = {
     'is_tab': True,
     'display_name': 'Brain-Hacking Chip'
@@ -227,6 +229,36 @@ def get_chip_params():
             params = get_widget_params(chip_blocks[selected_file]['ui_params'])
     
     return params
+
+settings_path = './extensions/BrainHackingChip/{filename}.json'
+
+def save_settings_click():
+    global settings_path
+    settings = {}
+    
+    for key, value in chip_blocks.items():
+        settings[key] = get_widget_params(value['ui_params'])
+        
+    try:
+        with open(os.path.join(os.getcwd(), settings_path.format(filename="default_settings")), 'w') as json_file:
+            json.dump(settings, json_file) 
+    except Exception as e:
+        print("Failed to save settings")
+        
+           
+def load_settings_click(chip_filename):
+    # Currently doing global settings, but could do settings for each chip in their own folders too
+    global settings_path
+    settings = None
+    
+    try:
+        with open(os.path.join(os.getcwd(), settings_path.format(filename="default_settings")), 'r') as json_file:
+            settings = json.load(json_file)    
+    except Exception as e:
+        print("Failed to load settings")
+        
+    # TODO: Actually loading these nested widgets is going to be interesting
+    # I'm still reading over and figuring out the new gradio code, sorry for how long it's taking me to get this basic feature up
             
 # I'm learning gradio with this function, bear with me here
 def ui():
@@ -241,6 +273,9 @@ def ui():
                 
                 # This isn't working now and I'm not sure why, made it invisible for now
                 gradio['sample_other_prompts'] = gr.Checkbox(label="Debug: Sample Other Prompts", value=False, info='Samples tokens from any extra prompts and prints their output to the console.', visible=False)            
+            with gr.Row():
+                gradio['save_settings_button'] = gr.Button("Save Settings")
+                gradio['load_settings_button'] = gr.Button("Load Settings", visible=False)
         with gr.Column():
             with gr.Row():
                 gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=None, label='Settings File', elem_classes='slim-dropdown', interactive=not mu)  
@@ -259,6 +294,11 @@ def ui():
     gradio['on_switch'].change(on_switch_change, gradio['on_switch'])
     gradio['output_prompts'].change(output_prompts_change, gradio['output_prompts'])
     gradio['sample_other_prompts'].change(sample_other_prompts_change, gradio['sample_other_prompts'])
+    
+    gradio['save_settings_button'].click(save_settings_click)
+    
+    # Not sure how to load yet
+    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=chipblocks_list)
     
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     global ui_settings, chip_settings
