@@ -244,12 +244,15 @@ def save_settings_click():
             json.dump(settings, json_file) 
     except Exception as e:
         print("Failed to save settings")
-        
-           
+                   
+# From what I know, this should work, not sure what I'm missing
 def load_settings_click(chip_filename):
     # Currently doing global settings, but could do settings for each chip in their own folders too
-    global settings_path
-    settings = None
+    global settings_path, widget_keys, widgets
+    
+    settings = {}
+    
+    join = "_-_"
     
     try:
         with open(os.path.join(os.getcwd(), settings_path.format(filename="default_settings")), 'r') as json_file:
@@ -257,8 +260,31 @@ def load_settings_click(chip_filename):
     except Exception as e:
         print("Failed to load settings")
         
-    # TODO: Actually loading these nested widgets is going to be interesting
-    # I'm still reading over and figuring out the new gradio code, sorry for how long it's taking me to get this basic feature up
+    settings_by_tag = {}
+        
+    def build_settings_strings(params, prefix):
+        for param, info in params.items():
+            next_prefix = prefix + join + param
+            
+            if 'value' in info:
+                settings_by_tag[next_prefix] = info['value']
+            
+            if 'sub' in info:
+                build_settings_strings(info['sub'], next_prefix)
+                
+    for chip_name, chip_settings in settings.items():
+        build_settings_strings(chip_settings, chip_name)
+        
+    settings_out = []
+        
+    for key in widget_keys:
+        if key in settings_by_tag:
+            settings_out.append(gr.update(value=settings_by_tag[key]))
+        else:
+            settings_out.append(gr.update())
+        
+    return settings_out
+        
             
 # I'm learning gradio with this function, bear with me here
 def ui():
@@ -295,8 +321,8 @@ def ui():
     
     gradio['save_settings_button'].click(save_settings_click)
     
-    # Not sure how to load yet
-    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=chipblocks_list)
+    # Not sure how to load yet... Have a function that outputs gr.updates for widgets, but the update doesn't happen
+    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=widgets)
     
     # Auto-load GUI widgets, will change this to load settings file once that's setup
     shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
