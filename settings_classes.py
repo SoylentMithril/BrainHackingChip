@@ -29,7 +29,8 @@ class VectorSettings:
         self.cfg_func = cfg_func
         
 class AttnSettings:
-    def __init__(self, 
+    def __init__(self,
+                 attn_mask=None, #provided with the attention mask generated for the current forward pass
                  h=None,# VectorSettings provided with / requesting hidden state vectors inputting into attention layer
                  h_post= None, # VectorSettings provided with / requesting hidden state vectors after qkv calc (useful if, for example, you want to restore them to the way they were before attn.h was called)
                  q_in=None, # VectorSettings provided with / requesting incoming query vectors
@@ -43,6 +44,7 @@ class AttnSettings:
                  a_ho=None, # VectorSettings provided with result of attention * value vectors of each head, prior to concatenation
                  a_c=None, # VectorSettings provided with concatenation of above, prior to attention output projection
                  a_po=None): # VectorSettings provided with attention output projection of above, prior to feed forward
+        self.attn_mask = attn_mask
         self.h = h 
         self.h_post = h_post
         self.q_in = q_in   

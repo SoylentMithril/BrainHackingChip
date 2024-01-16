@@ -43,17 +43,23 @@ def get_model_info():
     
     info['attn_layers'] = []
     
+    block_ct = 0
     for idx, module in enumerate(shared.model.generator.model.modules):
+        module.block_idx = block_ct
         if isinstance(module, ExLlamaV2Attention):
             info['attn_layers'].append(idx)
-        
+            # it's not strictly true that every transformer block has 1 attention layer
+            # so we can't actually reliably use this as a proxy for block index
+            # however -- and hear me out on this one -- let's do it anyway.
+            block_ct += 1 
+    info['block_ct'] = block_ct
     info['layers_count'] = info['head_layer'] + 1
     
     return info
 
 def hijack_loader(hackingchip):    
     shared.model.generator.model.hackingchip = hackingchip # hackingchip installed
-    
+    shared.model.model_info = get_model_info()
     if hackingchip.prompts.batch_size != shared.model.cache.batch_size: # the hackingchip tends to have extra batches, so it's time to prepare for that
         # I'm not correctly deleting the existing cache, but it gets removed from VRAM somehow anyway
         
@@ -284,23 +290,32 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     def hack_states(states, states_settings, dim_info=None):
         if states_settings.cfg_func:
             states = states_settings.cfg_func(states, states_settings, hackingchip, 
-                                                  layer_idx=self.layer_idx, 
-                                                  dim_info=dim_info, 
+                                                  layer_idx=self.layer_idx,
+                                                  block_idx=self.block_idx,
+                                                  dim_info=dim_info,
+                                                  model = shared.model,
+                                                  module = self,
+                                                  attn_mask = attn_mask,
+                                                  past_len = past_len, 
                                                   total_layers=hackingchip.attn_count, # storing attn_count on hackingchip
+                                                  total_blocks=shared.model.model_info['block_ct'],
                                                   cache=cache)
-        else:
+        else: # I think the lines until my next comment should be moved to a dedicated chip.
             if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
                 state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
-                state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
+                state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False)
                 state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
                 
-                states -= state_neg_steering
+                states -= state_neg_steering #I think the lines since my previous comment should be moved to a dedicated chip.
         return states
     
     #Hacking chip stuff
     hackingchip = shared.model.generator.model.hackingchip if hasattr(shared.model.generator.model, 'hackingchip') else None
     settings = [chip.attn_settings[self.layer_idx] for chip in hackingchip.settings if chip.attn_settings[self.layer_idx] is not None] if hackingchip else []
     
+    for chip_settings in settings:
+        if chip_settings.attn_mask: attn_mask = hack_states(hidden_states, chip_settings.attn_mask, None)
+          
     #Hacking chip stuff
     for chip_settings in settings:
         if chip_settings.h: hidden_states = hack_states(hidden_states, chip_settings.h, dim_info=hidden_state_diminfo)

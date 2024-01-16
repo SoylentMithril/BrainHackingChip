@@ -3,7 +3,7 @@ import gradio as gr
 from modules import shared
 
 from modules.ui import create_refresh_button
-
+from .util.ui_helpers import traverse_to
 import os
 import fnmatch
 
@@ -64,22 +64,25 @@ def make_chip_blocks(mu):
         for filename in file_list:
             path = chip_ui_path.format(name=filename)
             temp_chip_ui = importlib.import_module(path)
+            css_str = temp_chip_ui.custom_css if hasattr(temp_chip_ui, 'custom_css') else None            
             with gr.Group(visible=False) as widg_block:
+                if css_str is not None:
+                    gr.HTML(f"""<style>{css_str}</style>""")
                 chip_widg_elems, widget_keys, widget_values, ui_components = populate_widgets(temp_chip_ui.ui_params, mu, filename)
                 all_chip_widgets = [*all_chip_widgets, *chip_widg_elems]
                 for wk, wv in zip(widget_keys, chip_widg_elems):
                     dict_all_chip_widgets = {**dict_all_chip_widgets, **{wk : wv}}
-                
+            
             chip_blocks[filename] = {
                 'widg_block': widg_block,
                 'widget_keys': widget_keys,
                 'widget_values' : widget_values,
                 'chip_widgets': chip_widg_elems,
-                'ui_params': temp_chip_ui.ui_params
-            }
+                'chip_ui' : temp_chip_ui
+            }            
             chipblocks_list.append(widg_block)
-        for widg_key, widget in dict_all_chip_widgets.items():
-            widget.input(make_widget_change(widg_key), widget)
+        for widg_key, widge_ref in dict_all_chip_widgets.items():
+            widge_ref.change(make_widget_change(widg_key, widge_ref), widge_ref)
     except Exception as e:
         print("oh no.")
     return chip_blocks
@@ -174,23 +177,20 @@ def populate_widgets(ui_params, mu, prefix=None):
 
     return editable_elems, widget_keys, widget_values, ui_elems
 
-def traverse_to(from_obj, path):
-    if len(path) == 1 and path[0] in from_obj:
-        return from_obj[path[0]]
-    
-    newpath = path if path[0] in from_obj else ['sub_attr', *path]
-    return traverse_to(from_obj[newpath[0]], newpath[1:])
-    
-
-def make_widget_change(key):
+def make_widget_change(key, widge_ref):
     def widget_change(widget_val):
         global dict_all_chip_widgets, chip_blocks
         traverse_path = key.split("_-_")
-        ui_params = chip_blocks[traverse_path[0]]['ui_params']
-        obj = traverse_to(ui_params, traverse_path[1:])
-        obj['attributes']['value'] = widget_val
-        # print(str(index) + ": " + str(slider))
-        
+        chip_ui = chip_blocks[traverse_path[0]]['chip_ui']
+        if chip_ui.ui_params is not None:
+            ui_params = chip_ui.ui_params
+            obj = traverse_to(ui_params, traverse_path[1:], False)
+            obj['attributes']['value'] = widget_val
+            if 'callback' in obj:
+                if callable(obj['callback']): callback = obj['callback']
+                else: callback = getattr(chip_ui, obj['callback'])
+                callback(widget_ref = widge_ref, widget_val=widget_val, traverse_path=traverse_path)
+        # print(str(index) + ": " + str(slider))        
     return widget_change
 
 def on_switch_change(value):
