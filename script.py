@@ -15,17 +15,17 @@ params = {
 }
 
 gradio = {}
-selected_file = None
+selected_files = []
 default_max_widgets = 10 # This will probably have to be higher
 default_max_widgets = 10
 chip_path = "extensions.BrainHackingChip.chips.{name}.chip_settings"
 chip_ui_path = "extensions.BrainHackingChip.chips.{name}.chip_ui"
-active_chip_path = "extensions.BrainHackingChip.chips.default.chip_settings"
-active_chip_ui_path = "extensions.BrainHackingChip.chips.default.chip_ui"
+active_chip_path = "extensions.BrainHackingChip.chips.default.chip_settings" # not using this with multichip
+active_chip_ui_path = "extensions.BrainHackingChip.chips.default.chip_ui" # not using this with multichip
 chip_blocks = {}
 chipblocks_list = []
 # Globals
-chip_settings = None
+chip_settings = []
 # This should probably just be a dictionary, but I'm not sure if that would mess up gradio
 widget_keys = [] # store dictionary key of each slider in order
 widgets = []
@@ -87,32 +87,35 @@ def make_chip_blocks(mu):
         print("oh no.")
     return chip_blocks
 
-def select_file(filename):
-    global chip_settings, active_chip_path, active_chip_ui_path, selected_file
-    selected_file = filename
-    path = chip_path.format(name=filename)
+def select_file(filenames):
+    global chip_settings, active_chip_path, active_chip_ui_path, selected_files
+    selected_files = filenames
+    chip_settings = [] # eventually could avoid reloading already loaded things
     try:
-        chip_settings = importlib.import_module(path)
-        active_chip_path = path
-        active_chip_ui_path = chip_ui_path.format(name=filename)
+        for filename in filenames:
+            path = chip_path.format(name=filename)
+            chip_settings.append(importlib.import_module(path))
+            # active_chip_path = path
+            # active_chip_ui_path = chip_ui_path.format(name=filename)
     except Exception as e:
         try:
-            path = chip_path.format(name="default")
-            chip_settings = importlib.import_module(path)
-            active_chip_path = path
-            active_chip_ui_path = chip_ui_path.format(name=filename)
+            if not chip_settings:
+                path = chip_path.format(name="default")
+                chip_settings = importlib.import_module(path)
+                # active_chip_path = path
+                # active_chip_ui_path = chip_ui_path.format(name=filename)
         except Exception as e:
             print("You have no chips, choom")
         
-    importlib.reload(chip_settings)
-    return update_widget_visibility(filename)
+    for chip_settings_single in chip_settings: importlib.reload(chip_settings_single)
+    return update_widget_visibility(filenames)
 
-def update_widget_visibility(filename, *blockslist):
-    global chip_settings, widget_values, widget_keys, widgets, chipblocks_list, chip_blocks
+def update_widget_visibility(filenames, *blockslist):
+    global widget_values, widget_keys, widgets, chipblocks_list, chip_blocks
     #chip_block_keys = chip_blocks.keys()
     visibility = []
     for chipname, chipinfo in chip_blocks.items():
-        if filename == chipname:
+        if chipname in filenames:
             visibility.append(gr.update(visible=True))
             #blockitem.update(visible = True)  
             blockitem = chipinfo['widg_block']
@@ -220,13 +223,14 @@ def get_widget_params(widgets):
     return params
 
 def get_chip_params():
-    global chip_blocks, gradio
+    global chip_blocks, gradio, selected_files
     
-    params = {}
+    params = []
     
-    if selected_file and selected_file in chip_blocks:
-        if 'ui_params' in chip_blocks[selected_file]:
-            params = get_widget_params(chip_blocks[selected_file]['ui_params'])
+    for selected_file in selected_files:
+        if selected_file and selected_file in chip_blocks:
+            if 'ui_params' in chip_blocks[selected_file]:
+                params.append(get_widget_params(chip_blocks[selected_file]['ui_params']))
     
     return params
 
@@ -300,11 +304,12 @@ def ui():
                 # This isn't working now and I'm not sure why, made it invisible for now
                 gradio['sample_other_prompts'] = gr.Checkbox(label="Debug: Sample Other Prompts", value=False, info='Samples tokens from any extra prompts and prints their output to the console.', visible=False)            
             with gr.Row():
-                gradio['save_settings_button'] = gr.Button("Save Settings")
+                # Hiding save/load while figuring out loading
+                gradio['save_settings_button'] = gr.Button("Save Settings", visible=False)
                 gradio['load_settings_button'] = gr.Button("Load Settings", visible=False)
         with gr.Column():
             with gr.Row():
-                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value="default", label='Settings File', elem_classes='slim-dropdown', interactive=not mu)  
+                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=["default"], label='Settings File', elem_classes='slim-dropdown', multiselect=True, interactive=not mu)  
                 create_refresh_button(gradio['file_select'], lambda: None, lambda: {'choices': get_available_files()}, 'refresh-button', interactive=not mu)
             with gr.Row():
                 # Currently not using this, making it invisible for now... Not sure if I want script editing in here or not
@@ -336,8 +341,9 @@ def custom_generate_chat_prompt(user_input, state, **kwargs):
     importlib.reload(chip)
     
     if not chip_settings: # Just in case
-        chip_settings = importlib.import_module("extensions.BrainHackingChip.chips.default.chip_settings")
-        importlib.reload(chip_settings)
+        chip_settings_default = importlib.import_module("extensions.BrainHackingChip.chips.default.chip_settings")
+        importlib.reload(chip_settings_default)
+        chip_settings.append(chip_settings_default)
         
     prompt = chip.gen_full_prompt(chip_settings, ui_settings, ui_params, user_input, state, **kwargs)
     

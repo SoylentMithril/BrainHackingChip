@@ -1,8 +1,9 @@
 class Hackingchip:
-    def __init__(self, ui_settings, settings, prompts):
+    def __init__(self, ui_settings, settings, prompts, attn_count):
         self.ui_settings = ui_settings
         self.settings = settings
         self.prompts = prompts
+        self.attn_count = attn_count
         
 class HackingchipPrompts:
     def __init__(self, prompts, numpos, numneg):

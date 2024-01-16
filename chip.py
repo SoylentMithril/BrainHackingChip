@@ -38,17 +38,22 @@ def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **
             loader_module = importlib.import_module("extensions.BrainHackingChip.{loader}".format(loader=loader_module_path))
             importlib.reload(loader_module)
             
-            if hasattr(user_settings, 'gen_full_prompt'): # Prompt generation override for multiple batches, maybe other things?
-                baseprompt, prompts = user_settings.gen_full_prompt(user_input, state, **kwargs)
-            else:
+            baseprompt = None
+            for user_settings_single in user_settings:
+                if hasattr(user_settings_single, 'gen_full_prompt'): # Prompt generation override for multiple batches, maybe other things?
+                    baseprompt, prompts = user_settings_single.gen_full_prompt(user_input, state, **kwargs)
+                    break  # only picking the first one for now, later one will add a way to choose which parses the prompt
+            if not baseprompt:
                 baseprompt, prompts = default_gen_full_prompt(user_input, state, **kwargs) # prepare hackingchip prompts
             
             model_info = loader_module.get_model_info()
             
-            settings = user_settings.brainhackingchip_settings(HackingchipSettings(model_info['layers_count'], model_info['attn_layers']),
-                                                               ui_params, model_info['last_kv_layer'], model_info['head_layer']) # prepare hackingchip settings
-            
-            hackingchip = Hackingchip(ui_settings, settings, prompts)
+            settings = [user_settings_single.brainhackingchip_settings(
+                            HackingchipSettings(model_info['layers_count'], model_info['attn_layers']),
+                            ui_params_single, model_info['last_kv_layer'], model_info['head_layer']
+                        ) for user_settings_single, ui_params_single in zip(user_settings, ui_params)]            
+            # settings is an array now, can support multichip
+            hackingchip = Hackingchip(ui_settings, settings, prompts, len(model_info['attn_layers']))
             
             loader_module.hijack_loader(hackingchip)
 
