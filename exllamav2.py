@@ -236,19 +236,21 @@ def hijack_model_forward(self,
         x = module.forward(x, cache = cache, attn_mask = attn_mask, past_len = past_len, loras = loras, position_offsets = position_offsets)
         
         # Deprecated, moving to an attn focused setup
-        if hackingchip and hackingchip.prompts.numneg > 0 and hackingchip.settings.layer_settings[idx] != None:
-            settings = hackingchip.settings.layer_settings[idx]
-            
-            if settings.cfg_func:
-                x = settings.cfg_func(x, settings, hackingchip)
-            else:
-                x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend]
-                x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
-                x_neg_steering = settings.weight * (x_neg_steering - x[0])
+        if hackingchip:
+            for chip_settings in hackingchip.settings:
+                if chip_settings.layer_settings[idx] != None:
+                    settings = chip_settings.layer_settings[idx]
+                    
+                    if settings.cfg_func:
+                        x = settings.cfg_func(x, settings, hackingchip)
+                    elif hackingchip.prompts.numneg > 0:
+                        x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend]
+                        x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
+                        x_neg_steering = settings.weight * (x_neg_steering - x[0])
 
-                # It's important to steer all of the vectors, or else the difference artificially accumulates and accelerates.
-                x -= x_neg_steering
-        
+                        # It's important to steer all of the vectors, or else the difference artificially accumulates and accelerates.
+                        x -= x_neg_steering
+                
         if preprocess_only and idx == self.last_kv_layer_idx:
             x = None
             break
@@ -284,7 +286,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
             states = states_settings.cfg_func(states, states_settings, hackingchip, 
                                                   layer_idx=self.layer_idx, 
                                                   dim_info=dim_info, 
-                                                  total_layers=len(hackingchip.settings.attn_to_layers), # exllamav2 stores MLP, attn, etc layers each as their own index so its layer counts can't be used for only attention, but just the attention layer count is available through the len of this array, could be stored separately too
+                                                  total_layers=hackingchip.attn_count, # storing attn_count on hackingchip
                                                   cache=cache)
         else:
             if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
@@ -297,10 +299,10 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     
     #Hacking chip stuff
     hackingchip = shared.model.generator.model.hackingchip if hasattr(shared.model.generator.model, 'hackingchip') else None
-    chip_settings = hackingchip.settings.attn_settings[self.layer_idx] if hackingchip and hackingchip.settings.attn_settings[self.layer_idx] != None else None
+    settings = [chip.attn_settings[self.layer_idx] for chip in hackingchip.settings if chip.attn_settings[self.layer_idx] is not None] if hackingchip else []
     
     #Hacking chip stuff
-    if chip_settings:
+    for chip_settings in settings:
         if chip_settings.h: hidden_states = hack_states(hidden_states, chip_settings.h, dim_info=hidden_state_diminfo)
     
     if self.q_handle is None or intermediates:
@@ -352,7 +354,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     v_states = v_states.view(batch_size, q_len, num_key_value_heads, head_dim)
 
     #Hacking chip stuff
-    if chip_settings:
+    for chip_settings in settings:
         if chip_settings.q_in: q_states = hack_states(q_states, chip_settings.q_in, dim_info=flash_att_diminfo)
         if chip_settings.k_in: k_states = hack_states(k_states, chip_settings.k_in, dim_info=flash_att_diminfo)
         if chip_settings.v_in: v_states = hack_states(v_states, chip_settings.v_in, dim_info=flash_att_diminfo)
@@ -383,14 +385,14 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
         # Torch matmul attention
 
         if self.model.config.no_flash_attn or not has_flash_attn:
-            attn_output = hacked_unflashed_attn_forward(self, attn_mask, chip_settings, hack_states, num_key_value_groups, 
+            attn_output = hacked_unflashed_attn_forward(self, attn_mask, settings, hack_states, num_key_value_groups, 
                              batch_size, head_dim, hidden_size, q_len, 
                              hidden_states, q_states, k_states, v_states)
 
         # Flash Attention 2
 
         else:
-           attn_output = hacked_flash_attn_forward(chip_settings, hack_states, 
+           attn_output = hacked_flash_attn_forward(settings, hack_states, 
                              batch_size, hidden_size, q_len, 
                              q_states, k_states, v_states)
 
@@ -420,7 +422,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     # Multiple caches
 
     else:
-        attn_outputs = multi_cache_attn_forward(self, cache, attn_mask, chip_settings, hack_states, num_key_value_groups,
+        attn_outputs = multi_cache_attn_forward(self, cache, attn_mask, settings, hack_states, num_key_value_groups,
                                                 batch_size, head_dim, past_len, q_len, 
                                                 hidden_states, q_states, k_states, v_states)
 
@@ -435,7 +437,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
    
     
     #Hacking chip stuff
-    if chip_settings:
+    for chip_settings in settings:
         if chip_settings.a_c: attn_output = hack_states(hidden_states, chip_settings.a_c)
     
     #Output projection
@@ -446,7 +448,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
                             q_len,
                             pass_loras,
                             pass_lora_temp)
-    if chip_settings:
+    for chip_settings in settings:
         if chip_settings.a_po: attn_output = hack_states(attn_output, chip_settings.a_po)
 
     attn_output = None
@@ -455,11 +457,11 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     return hidden_states
 
 
-def hacked_flash_attn_forward(chip_settings, hack_states, 
+def hacked_flash_attn_forward(hack_settings, hack_states, 
                              batch_size, hidden_size, q_len, 
                              q_states, k_states, v_states):
      #Hacking chip stuff
-    if chip_settings:     
+    for chip_settings in hack_settings:
         if chip_settings.k_all: k_states = hack_states(k_states, chip_settings.k_all, flash_att_diminfo) 
         if chip_settings.v_all: v_states = hack_states(v_states, chip_settings.v_all, flash_att_diminfo) 
     
@@ -467,7 +469,7 @@ def hacked_flash_attn_forward(chip_settings, hack_states,
     attn_output = attn_output.reshape((batch_size, q_len, hidden_size))
     return attn_output
 
-def hacked_unflashed_attn_forward(self, attn_mask, chip_settings, hack_states, num_key_value_groups, 
+def hacked_unflashed_attn_forward(self, attn_mask, hack_settings, hack_states, num_key_value_groups, 
                              batch_size, head_dim, hidden_size, q_len, 
                              hidden_states, q_states, k_states, v_states):
     q_states = q_states.transpose(1, 2)
@@ -477,7 +479,7 @@ def hacked_unflashed_attn_forward(self, attn_mask, chip_settings, hack_states, n
     k_states = self.repeat_kv(k_states, num_key_value_groups)    
     v_states = self.repeat_kv(v_states, num_key_value_groups)
     #Hacking chip stuff
-    if chip_settings:
+    for chip_settings in hack_settings:
         if chip_settings.k_all: k_states = hack_states(k_states, chip_settings.k_all, dim_info=unflash_att_diminfo)
         if chip_settings.v_all: v_states = hack_states(v_states, chip_settings.v_all, dim_info=unflash_att_diminfo)
 
@@ -493,7 +495,7 @@ def hacked_unflashed_attn_forward(self, attn_mask, chip_settings, hack_states, n
     
     attn_output = torch.matmul(attn_weights, v_states)
     
-    if chip_settings:
+    for chip_settings in hack_settings:
         if chip_settings.a_ho: attn_output = hack_states(attn_output, chip_settings.a_ho, dim_info=unflash_att_diminfo)
         
     v_states = None
@@ -502,7 +504,7 @@ def hacked_unflashed_attn_forward(self, attn_mask, chip_settings, hack_states, n
     attn_output = attn_output.reshape((batch_size, q_len, hidden_size))
     return attn_output
     
-def multi_cache_attn_forward(self, cache, attn_mask, chip_settings, hack_states, num_key_value_groups, 
+def multi_cache_attn_forward(self, cache, attn_mask, hack_settings, hack_states, num_key_value_groups, 
                              batch_size, head_dim, past_len, q_len, 
                              hidden_states, q_states, k_states, v_states):
     attn_outputs = []
@@ -534,7 +536,7 @@ def multi_cache_attn_forward(self, cache, attn_mask, chip_settings, hack_states,
         k_states_b = k_states_b.transpose(-1, -2)
         
         #Hacking chip stuff
-        if chip_settings:
+        for chip_settings in hack_settings:
             if chip_settings.q1: q_states = hack_states(q_states, chip_settings.q1)
             if chip_settings.k1: k_states = hack_states(k_states, chip_settings.k1)
             if chip_settings.v1: v_states = hack_states(v_states, chip_settings.v1)
@@ -551,7 +553,7 @@ def multi_cache_attn_forward(self, cache, attn_mask, chip_settings, hack_states,
         attn_output_b = torch.matmul(attn_weights, v_states_b)
         v_states_b = None
         
-        if chip_settings:
+        for chip_settings in hack_settings:
             if chip_settings.a_ho: attn_output_b = hack_states(attn_output_b, chip_settings.a_ho)
         attn_outputs.append(attn_output_b)
     return attn_outputs
