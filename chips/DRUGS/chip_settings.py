@@ -53,7 +53,7 @@ def get_shaped_dose(key, block_idx, total_blocks):
   if key not in active_noise_shapes: return 0
   base_theta = traverse_to(ui_params, [key,'type_globals','dose_theta'])
   shape_obj = active_noise_shapes[key]
-  if len(shape_obj['shape]']) == 0: return 0
+  if len(shape_obj['shape']) == 0: return 0
   interpolation_mode = shape_obj['mode']
   shape_arr = shape_obj['shape']
   shaped_dose = base_theta * get_tissue_bioavailability(block_idx, total_blocks, shape_arr, interpolation_mode)

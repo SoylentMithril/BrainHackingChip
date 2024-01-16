@@ -306,7 +306,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
                                                   total_layers=hackingchip.attn_count, # storing attn_count on hackingchip
                                                   total_blocks=shared.model.model_info['block_ct'],
                                                   cache=cache)
-        else: # I think the lines until my next comment should be moved to a dedicated chip.
+        else:
             print("cfg_func required")
             # if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
             #     state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
