@@ -228,9 +228,10 @@ def get_chip_params():
     params = []
     
     for selected_file in selected_files:
-        if selected_file and selected_file in chip_blocks:
-            if 'ui_params' in chip_blocks[selected_file]:
-                params.append(get_widget_params(chip_blocks[selected_file]['ui_params']))
+        if selected_file and selected_file in chip_blocks and 'chip_ui' in chip_blocks[selected_file]:
+            params.append(get_widget_params(chip_blocks[selected_file]['chip_ui'].ui_params))
+        else: # This shouldn't ever happen, but things get really messed up if ui_params len isn't chip_blocks len
+            params.append({})
     
     return params
 

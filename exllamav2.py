@@ -462,7 +462,7 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     for chip_settings in settings:
         # Due to this being a loop now, I need to make sure the input and output are the same variable
         # I'm not sure if this should both be attn_output or both hidden_states
-        # My instinct is to have the line below pass attn_output into hack_states
+        # My instinct is to have the line below pass attn_output into hack_states, and not using hidden_states here
         if chip_settings.a_c: attn_output = hack_states(hidden_states, chip_settings.a_c)
     
     #Output projection
