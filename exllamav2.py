@@ -124,21 +124,21 @@ def hijack_generate_with_streaming(self, prompt, state):
     for i in range(max_new_tokens):
         chunk, eos, _ = self.generator.stream()
         if eos or shared.stop_everything:
-            # Below is getting skipped now and I have no idea why
-            if hackingchip and hackingchip.ui_settings['sample_other_prompts'] and hasattr(hackingchip, 'real_ids'):
-                strings = self.generator.tokenizer.decode(hackingchip.real_ids)
+            # Below is getting skipped now and I have no idea why, commenting it out for now
+            # if hackingchip and hackingchip.ui_settings['sample_other_prompts'] and hasattr(hackingchip, 'real_ids'):
+            #     strings = self.generator.tokenizer.decode(hackingchip.real_ids)
                 
-                if hackingchip.prompts.numpos > 1:
-                    print("Extra positive prompt output:")
+            #     if hackingchip.prompts.numpos > 1:
+            #         print("Extra positive prompt output:")
                     
-                    for index, string_value in enumerate(strings[1:hackingchip.prompts.numpos], start=1):
-                        print(" Positive (" + str(index) + "): " + string_value)
+            #         for index, string_value in enumerate(strings[1:hackingchip.prompts.numpos], start=1):
+            #             print(" Positive (" + str(index) + "): " + string_value)
                 
-                if hackingchip.prompts.numneg > 0:
-                    print("Negative prompt output:")
+            #     if hackingchip.prompts.numneg > 0:
+            #         print("Negative prompt output:")
                     
-                    for index, string_value in enumerate(strings[hackingchip.prompts.numpos:hackingchip.prompts.negend], start=hackingchip.prompts.numpos):
-                        print(" Negative " + str(index) + ": " + string_value)
+            #         for index, string_value in enumerate(strings[hackingchip.prompts.numpos:hackingchip.prompts.negend], start=hackingchip.prompts.numpos):
+            #             print(" Negative " + str(index) + ": " + string_value)
                 
             if hasattr(self.generator.model, 'hackingchip'): del self.generator.model.hackingchip # remove hackingchip after use, just in case
             # TODO: I realized I probably should return the functions back to normal too, have to store and retrieve to do so
@@ -241,7 +241,9 @@ def hijack_model_forward(self,
         x = safe_move_tensor(x, device)
         x = module.forward(x, cache = cache, attn_mask = attn_mask, past_len = past_len, loras = loras, position_offsets = position_offsets)
         
-        # Deprecated, moving to an attn focused setup
+        # Moving toward deprecating this, once I have a negative CFG that can do the same result
+        # This does have access to some layer information that the attn layers don't, but not much
+        # If there are no chips that have assigned anything to layer_settings, nothing should happen here
         if hackingchip:
             for chip_settings in hackingchip.settings:
                 if chip_settings.layer_settings[idx] != None:
@@ -249,13 +251,17 @@ def hijack_model_forward(self,
                     
                     if settings.cfg_func:
                         x = settings.cfg_func(x, settings, hackingchip)
-                    elif hackingchip.prompts.numneg > 0:
-                        x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend]
-                        x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
-                        x_neg_steering = settings.weight * (x_neg_steering - x[0])
+                        None
+                    else:
+                        print("cfg_func required")
+        
+                    # elif hackingchip.prompts.numneg > 0:
+                    #     x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend]
+                    #     x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
+                    #     x_neg_steering = settings.weight * (x_neg_steering - x[0])
 
-                        # It's important to steer all of the vectors, or else the difference artificially accumulates and accelerates.
-                        x -= x_neg_steering
+                    #     # It's important to steer all of the vectors, or else the difference artificially accumulates and accelerates.
+                    #     x -= x_neg_steering
                 
         if preprocess_only and idx == self.last_kv_layer_idx:
             x = None
@@ -301,12 +307,13 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
                                                   total_blocks=shared.model.model_info['block_ct'],
                                                   cache=cache)
         else: # I think the lines until my next comment should be moved to a dedicated chip.
-            if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
-                state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
-                state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False)
-                state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
+            print("cfg_func required")
+            # if hackingchip.prompts.numneg > 0 and states_settings.weight != 0.0:
+            #     state_neg_steering = states[hackingchip.prompts.numpos:hackingchip.prompts.negend]
+            #     state_neg_steering = torch.mean(state_neg_steering, dim=0, keepdim=False)
+            #     state_neg_steering = states_settings.weight * (state_neg_steering - states[0])
                 
-                states -= state_neg_steering #I think the lines since my previous comment should be moved to a dedicated chip.
+            #     states -= state_neg_steering #I think the lines since my previous comment should be moved to a dedicated chip.
         return states
     
     #Hacking chip stuff
@@ -453,6 +460,9 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
     
     #Hacking chip stuff
     for chip_settings in settings:
+        # Due to this being a loop now, I need to make sure the input and output are the same variable
+        # I'm not sure if this should both be attn_output or both hidden_states
+        # My instinct is to have the line below pass attn_output into hack_states
         if chip_settings.a_c: attn_output = hack_states(hidden_states, chip_settings.a_c)
     
     #Output projection
@@ -464,6 +474,8 @@ def hijack_attn_forward(self, hidden_states, cache = None, attn_mask = None, pas
                             pass_loras,
                             pass_lora_temp)
     for chip_settings in settings:
+        # attn_output gets set to None right below this and then hidden_states are returned
+        # Should this deal with hidden_states?
         if chip_settings.a_po: attn_output = hack_states(attn_output, chip_settings.a_po)
 
     attn_output = None

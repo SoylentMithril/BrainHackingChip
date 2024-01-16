@@ -330,6 +330,8 @@ def ui():
     gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=widgets)
     
     # Auto-load GUI widgets, will change this to load settings file once that's setup
+    # This solution isn't perfect though, it requires the user to visit the UI first
+    # So if a user has the UI up, closes the backend and restarts it, then interacts with the UI without reloading, the below event will not have triggered
     shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
     
 def custom_generate_chat_prompt(user_input, state, **kwargs):

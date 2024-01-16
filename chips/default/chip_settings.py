@@ -42,26 +42,20 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     
     weight = params['weight']['value'] if 'weight' in params and 'value' in params['weight'] else 0.2 # still no autoload so have to be careful here
     
-    # Repels positive from negative, up to a distance determined by negative's magnitude * settings.weight
-    def cfg_repulsor(tensor, settings, hackingchip):
-            # Get negative tensor
-            tensor_neg_orig = tensor[hackingchip.prompts.numpos:hackingchip.prompts.negend, :, :]
-            tensor_neg_orig = torch.mean(tensor_neg_orig, dim=0, keepdim=False)
-            
-            # Find the strength of the repulsion, the difference between pos and neg, and the magnitude of that difference
-            strength = torch.norm(tensor_neg_orig).item() * settings.weight
-            difference = tensor[0] - tensor_neg_orig
-            diff_strength = torch.norm(difference).item()
-            
-            # If the repulsion strength is higher than the distance between pos and neg, repel pos so it's at that distance away
-            # If pos is already repulsion strength distance away or more, then don't modify it (although this could be changed to pull it back toward neg)
-            repulsion = ((strength / diff_strength) - 1) * difference if strength > diff_strength else torch.zeros_like(difference)
-            
-            tensor[0] += repulsion # There's no accelerating issues with this cfg func, so only need to modify positive
-            return tensor
+    def cfg_default(tensor, settings, hackingchip):
+      if hackingchip.prompts.numneg > 0:
+        x_neg_steering = tensor[hackingchip.prompts.numpos:hackingchip.prompts.negend]
+        x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
+        x_neg_steering = settings.weight * (x_neg_steering - tensor[0])
+
+        # It's important to steer all of the vectors, or else the difference artificially accumulates and accelerates.
+        tensor -= x_neg_steering
+        
+      return tensor
+    
         
     # Set a cfg_func for my thought CFG example
-    thought_cfg_func = None
+    thought_cfg_func = cfg_default
     
     # The weight of the CFG for thoughts in this example, change this value to change how strongly thoughts are affected by negative prompts
     # The amount of weight to use seems to depend on how many layers you are putting it on
@@ -95,7 +89,7 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     attn_weight = weight
     
     # You can do custom cfg_func with Q, K, V as well! It's the exact same function signature (so can use the same function for all if you want)
-    attn_cfg_func = None
+    attn_cfg_func = cfg_default
     
     attn_test = AttnSettings()
     
