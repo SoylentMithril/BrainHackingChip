@@ -48,10 +48,15 @@ def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **
             
             model_info = loader_module.get_model_info()
             
+            temp_ui_params = {} # Need to adjust to GUI changes, disabling ui_params and doing this workaround for now
             settings = [user_settings_single.brainhackingchip_settings(
                             HackingchipSettings(model_info['layers_count'], model_info['attn_layers']),
-                            ui_params_single, model_info['last_kv_layer'], model_info['head_layer']
-                        ) for user_settings_single, ui_params_single in zip(user_settings, ui_params)]            
+                            temp_ui_params, model_info['last_kv_layer'], model_info['head_layer']
+                        ) for user_settings_single in user_settings]            
+            # settings = [user_settings_single.brainhackingchip_settings(
+            #                 HackingchipSettings(model_info['layers_count'], model_info['attn_layers']),
+            #                 ui_params_single, model_info['last_kv_layer'], model_info['head_layer']
+            #             ) for user_settings_single, ui_params_single in zip(user_settings, ui_params)]            
             # settings is an array now, can support multichip
             hackingchip = Hackingchip(ui_settings, settings, prompts, len(model_info['attn_layers']))
             
