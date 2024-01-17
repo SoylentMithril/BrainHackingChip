@@ -1,11 +1,15 @@
 import importlib
 import gradio as gr
-from modules import shared
+from modules import shared, chat, ui, ui_chat, ui_default, ui_file_saving, ui_model_menu, ui_notebook, ui_parameters, ui_session, models_settings, training
+import server
 
-from modules.ui import create_refresh_button
+from modules.ui import create_refresh_button, list_interface_input_elements
 from .util.ui_helpers import traverse_to
 import os
 import fnmatch
+
+import inspect
+
 
 import json
 
@@ -85,6 +89,9 @@ def make_chip_blocks(mu):
             widge_ref.change(make_widget_change(widg_key, widge_ref), widge_ref)
     except Exception as e:
         print("oh no.")
+        
+    update_shared_gradio_refs(dict_all_chip_widgets)
+    
     return chip_blocks
 
 def select_file(filenames):
@@ -238,7 +245,7 @@ def get_chip_params():
 settings_path = './extensions/BrainHackingChip/{filename}.json'
 
 def save_settings_click():
-    global settings_path
+    global settings_path, chip_blocks
     settings = {}
     
     for key, value in chip_blocks.items():
@@ -289,7 +296,172 @@ def load_settings_click(chip_filename):
             settings_out.append(gr.update())
         
     return settings_out
+
+all_shared_widget_keys = []
+
+
+# Once state is generated with all the BHC values in it, I need to extract them for easy use
+def get_state_ui_params(state):
+    # Ok, so I return a list, with an entry for each file in order, so start with a dict with a filename for each for now
+    # Then the value is a dict of names
+    # Each name is a dict that may have a value or sub, and sub will contain a dict of names
+    
+    # use these to order it into an array? 
+    filenames_in_order = get_available_files()
+    
+    bhc = "bhc"
+    join = "_-_"
+    bhc_prefix = bhc + join
+    
+    params_root = {}
+    
+    # Example: params_root['DRUGS']['sub']
+    
+    def parse_key(key, value, params):
+        parts = key.split(join, 1)
         
+        if len(parts) == 2: # can't place value yet
+            this_parent = parts[0]
+            next_key = parts[1]
+            
+            if not this_parent in params:
+                params[this_parent] = {}
+                
+            this_params = params[this_parent]
+            
+            if not 'sub' in this_params:
+                this_params['sub'] = {}
+            
+            parse_key(next_key, value, this_params['sub'])
+        else: # can place value
+            if not key in params:
+                params[key] = {}
+                
+            params[key]['value'] = value
+    
+    for key, value in state.items():
+        if key.startswith(bhc_prefix):
+            next_key = key[len(bhc_prefix):]
+            parse_key(next_key, value, params_root)
+     
+    # Now to put it all in order in the list
+    params_list = [params_root[filename]['sub'] if filename in params_root else {} for filename in filenames_in_order]
+            
+    return params_list
+    
+    
+# After generating widgets in here, I call this and put them all in shared.gradio and do other supporting things
+def update_shared_gradio_refs(all_widgets):
+    global all_shared_widget_keys
+    
+    # doing all widgets so I don't have to change this much
+    
+    bhc_prefix = "bhc_-_"
+    bhc_format = bhc_prefix + "{key}"
+    
+    # first have to remove all bhc references in shared.gradio
+    shared.gradio = {key: value for key, value in shared.gradio.items() if not key.startswith(bhc_prefix)}
+    
+    # this was another way I was removing old references, but the above is probably better
+    # for widget_key in all_shared_widget_keys:
+    #     if widget_key in shared.gradio:
+    #         del shared.gradio[widget_key]
+    
+    # this may have already been set, just going to set it again
+    # it shouldn't be set with the current code, but I'll just leave this anyway
+    all_shared_widget_keys = []
+    
+    # Putting every widget in shared.gradio and storing the key used for it in all_shared_widget_keys
+    for key, value in all_widgets.items():
+        bhc_key = bhc_format.format(key=key)
+        all_shared_widget_keys.append(bhc_key)
+        shared.gradio[bhc_key] = value
+                
+    # Need to update this or bad things happen
+    shared.input_elements = hijack_list_interface_input_elements()
+    
+    # TODO: If the below func() calls get run more than once, I'm sure it will be very bad
+    # They add all the UI event handlers in ooba among other things, so this function really shouldn't be called twice
+    
+    # TODO: Ok, for the below, I need to separate the function lists
+    # The create_ui thing needs to run during extension tab creation or something
+    # Not quite sure how to fix that
+    # Right now, session tab ends up in this BHC tab
+    for func in original_create_ui:
+        None # Not running func() currently because it will be placed in the BHC tab
+        # func()
+        
+    # Ok, and now I need to call the rest of the UI setup functions, it will be useless without these
+    for func in original_event_handlers:
+        func()
+        
+original_func = list_interface_input_elements
+           
+def hijack_list_interface_input_elements():
+    global all_shared_widget_keys
+    
+    elements = original_func()
+    
+    # putting all bhc shared.gradio keys in, this will make ooba process the widget values
+    elements += all_shared_widget_keys
+    
+    
+    return elements
+    
+def hijack_and_do_nothing():
+    # print("test")
+    None
+
+def setup():
+    global all_shared_widget_keys, chip_ui_path, original_event_handlers, original_create_ui
+    
+    # It's time to hijack some functions in the normal webui code so we can hook into the state gathering events
+    # However, this makes other parts of the webui code angry, so we have to hijack them too and make them chill awhile
+    
+    # Using inspect to target every usage of ui
+    
+    all_modules = [m for m in globals().values() if inspect.ismodule(m)]
+    
+    hijack_ui_map = {
+        'list_interface_input_elements': hijack_list_interface_input_elements,
+    }
+    
+    for module in all_modules:
+        if hasattr(module, 'ui'):
+            ui_module = getattr(module, 'ui')
+            # print(module.__name__) # debugging for now
+            for func_name, hijack_func in hijack_ui_map.items():
+                if hasattr(ui_module, func_name) and callable(getattr(ui_module, func_name)):
+                    setattr(ui_module, func_name, hijack_func) 
+                   
+    # Ok, and then all of these functions will break if they run before this extension's ui() function runs
+    # So it's time for them to take a little nap until that happens       
+ 
+    delay_create_ui = [
+        ui_session
+    ]
+
+    delay_create_event_handlers = [
+        ui_chat, 
+        ui_default,
+        ui_notebook, 
+        ui_file_saving,
+        ui_parameters,
+        ui_model_menu
+        ]
+    
+    # This is what will run them again
+    original_event_handlers = [delay.create_event_handlers for delay in delay_create_event_handlers]
+    
+    # TODO: I'm not actually calling this anywhere because it puts the created UI inside the BHC tab! I'll keep thinking of a fix
+    original_create_ui = [delay.create_ui for delay in delay_create_ui]
+    
+    for delay in delay_create_ui:
+        delay.create_ui = hijack_and_do_nothing 
+        
+    for delay in delay_create_event_handlers:
+        delay.create_event_handlers = hijack_and_do_nothing
+    
             
 # I'm learning gradio with this function, bear with me here
 def ui():
@@ -338,7 +510,7 @@ def ui():
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     global ui_settings, chip_settings
     
-    ui_params = get_chip_params()
+    ui_params = get_state_ui_params(state)
     
     chip = importlib.import_module("extensions.BrainHackingChip.chip")
     importlib.reload(chip)

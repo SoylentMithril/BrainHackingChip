@@ -52,7 +52,7 @@ def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **
             while len(ui_params) < len(user_settings):
                 ui_params.append({})        
                     
-            # The issue is the commented block below was for is now fixed, but I'm leaving it for a bit just in case
+            # The issue the commented block below was for is now fixed, but I'm leaving it for a bit just in case
             # temp_ui_params = {} # Need to adjust to GUI changes, disabling ui_params and doing this workaround for now
             # settings = [user_settings_single.brainhackingchip_settings(
             #                 HackingchipSettings(model_info['layers_count'], model_info['attn_layers']),
