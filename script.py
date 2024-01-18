@@ -91,6 +91,7 @@ def make_chip_blocks(mu):
             chipblocks_list.append(widg_block)
         for widg_key, widge_ref in dict_all_chip_widgets.items():
             widge_ref.change(make_widget_change(widg_key, widge_ref), widge_ref)
+            widge_ref.release(make_widget_change(widg_key, widge_ref), widge_ref)
     except Exception as e:
         print("oh no.")
         
@@ -460,7 +461,7 @@ def hijack_session_create_event_handlers():
             lambda: 'settings.yaml', None, gradiofunc('save_filename')).then(
             lambda: gr.update(visible=True), None, gradiofunc('file_saver'))
             
-def setup():
+def setup2(): # Changed the name for now to see if the bug persists without this way overcomplicated workaround
     global all_shared_widget_keys, chip_ui_path, original_event_handlers
     
     # It's time to hijack some functions in the normal webui code so we can hook into the state gathering events
@@ -497,7 +498,6 @@ def setup():
     # This is what will run them again
     original_event_handlers = [delay.create_event_handlers for delay in delay_create_event_handlers]
     
-    # TODO: I'm not actually calling this anywhere because it puts the created UI inside the BHC tab! I'll keep thinking of a fix
     # This will construct the session UI in the normal place, so the tab doesn't get displaced
     # ui_session.create_ui = hijack_and_do_nothing # disabling display of session for now
     ui_session.create_ui = hijack_session_create_ui
