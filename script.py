@@ -90,8 +90,9 @@ def make_chip_blocks(mu):
             }            
             chipblocks_list.append(widg_block)
         for widg_key, widge_ref in dict_all_chip_widgets.items():
-            widge_ref.change(make_widget_change(widg_key, widge_ref), widge_ref)
-            widge_ref.release(make_widget_change(widg_key, widge_ref), widge_ref)
+            if hasattr(widge_ref, 'change'): widge_ref.change(make_widget_change(widg_key, widge_ref), widge_ref)
+            # Some widgets don't have release, so I need to check for that. Checking for change too just in case
+            if hasattr(widge_ref, 'release'): widge_ref.release(make_widget_change(widg_key, widge_ref), widge_ref)
     except Exception as e:
         print("oh no.")
         
@@ -251,10 +252,12 @@ settings_path = './extensions/BrainHackingChip/{filename}.json'
 
 def save_settings_click():
     global settings_path, chip_blocks
-    settings = {}
+    params = {}
     
     for key, value in chip_blocks.items():
-        settings[key] = get_widget_params(value['ui_params'])
+        params[key] = get_widget_params(value['chip_ui'].ui_params)
+        
+    settings = {'params': params}
         
     try:
         with open(os.path.join(os.getcwd(), settings_path.format(filename="default_settings")), 'w') as json_file:
@@ -289,12 +292,20 @@ def load_settings_click(chip_filename):
             if 'sub' in info:
                 build_settings_strings(info['sub'], next_prefix)
                 
-    for chip_name, chip_settings in settings.items():
-        build_settings_strings(chip_settings, chip_name)
+    if 'params' in settings:
+        for chip_name, chip_settings in settings['params'].items():
+            build_settings_strings(chip_settings, chip_name)
         
+    for key, value in settings_by_tag.items():
+        if key in dict_all_chip_widgets:
+            dict_all_chip_widgets[key].update(value=value)
+              
+    # Adding the above update() call is what got load to update the GUI, not sure how necessary the below part is
+    # However, if I try to remove it then things break, so maybe both are needed?
+    
     settings_out = []
         
-    for key in widget_keys:
+    for key, widget in dict_all_chip_widgets.items():
         if key in settings_by_tag:
             settings_out.append(gr.update(value=settings_by_tag[key]))
         else:
@@ -522,17 +533,13 @@ def ui():
                 
                 # This isn't working now and I'm not sure why, made it invisible for now
                 gradio['sample_other_prompts'] = gr.Checkbox(label="Debug: Sample Other Prompts", value=False, info='Samples tokens from any extra prompts and prints their output to the console.', visible=False)            
-            with gr.Row():
-                # Hiding save/load while figuring out loading
-                gradio['save_settings_button'] = gr.Button("Save Settings", visible=False)
-                gradio['load_settings_button'] = gr.Button("Load Settings", visible=False)
         with gr.Column():
             with gr.Row():
                 gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=["default"], label='Settings File', elem_classes='slim-dropdown', multiselect=True, interactive=not mu)  
                 create_refresh_button(gradio['file_select'], lambda: None, lambda: {'choices': get_available_files()}, 'refresh-button', interactive=not mu)
             with gr.Row():
-                # Currently not using this, making it invisible for now... Not sure if I want script editing in here or not
-                gradio['file_text'] = gr.Textbox(value='', lines=27, elem_id='textbox-notebook', elem_classes=['textbox', 'add_scrollbar'], visible=False)
+                gradio['save_settings_button'] = gr.Button("Save Settings")
+                gradio['load_settings_button'] = gr.Button("Load Settings")
     
     with gr.Row():
         widget_containers_full = make_chip_blocks(mu)
@@ -546,7 +553,7 @@ def ui():
     gradio['save_settings_button'].click(save_settings_click)
     
     # Not sure how to load yet... Have a function that outputs gr.updates for widgets, but the update doesn't happen
-    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=widgets)
+    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=list(dict_all_chip_widgets.values()))
     
     # Auto-load GUI widgets, will change this to load settings file once that's setup
     # This solution isn't perfect though, it requires the user to visit the UI first
