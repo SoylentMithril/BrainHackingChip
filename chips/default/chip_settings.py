@@ -40,7 +40,8 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     For an example of a custom cfg_func, see cfg_repulsor below
     """
     
-    weight = params['weight']['value'] if 'weight' in params and 'value' in params['weight'] else 0.2 # still no autoload so have to be careful here
+    # weight = params['weight']['value'] if 'weight' in params and 'value' in params['weight'] else 0.2 # still no autoload so have to be careful here
+    weight = ui_params['weight']['attributes']['value']
     
     def cfg_default(tensor, settings, hackingchip):
       if hackingchip.prompts.numneg > 0:

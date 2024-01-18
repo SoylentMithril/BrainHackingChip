@@ -95,7 +95,7 @@ def make_chip_blocks(mu):
     except Exception as e:
         print("oh no.")
         
-    update_shared_gradio_refs(dict_all_chip_widgets)
+    # update_shared_gradio_refs(dict_all_chip_widgets)
     
     return chip_blocks
 
@@ -302,8 +302,9 @@ def load_settings_click(chip_filename):
         
     return settings_out
 
-all_shared_widget_keys = []
 
+""" Hopefully won't need this
+all_shared_widget_keys = []
 
 # Once state is generated with all the BHC values in it, I need to extract them for easy use
 def get_state_ui_params(state):
@@ -461,7 +462,7 @@ def hijack_session_create_event_handlers():
             lambda: 'settings.yaml', None, gradiofunc('save_filename')).then(
             lambda: gr.update(visible=True), None, gradiofunc('file_saver'))
             
-def setup2(): # Changed the name for now to see if the bug persists without this way overcomplicated workaround
+def setup(): # Changed the name for now to see if the bug persists without this way overcomplicated workaround
     global all_shared_widget_keys, chip_ui_path, original_event_handlers
     
     # It's time to hijack some functions in the normal webui code so we can hook into the state gathering events
@@ -506,7 +507,7 @@ def setup2(): # Changed the name for now to see if the bug persists without this
     
     for delay in delay_create_event_handlers:
         delay.create_event_handlers = hijack_and_do_nothing
-    
+"""
             
 # I'm learning gradio with this function, bear with me here
 def ui():
@@ -555,7 +556,7 @@ def ui():
 def custom_generate_chat_prompt(user_input, state, **kwargs):
     global ui_settings, chip_settings
     
-    ui_params = get_state_ui_params(state)
+    ui_params = get_chip_params()
     
     chip = importlib.import_module("extensions.BrainHackingChip.chip")
     importlib.reload(chip)
