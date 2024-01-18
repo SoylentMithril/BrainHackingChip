@@ -1,9 +1,13 @@
 import importlib
 import gradio as gr
-from modules import shared, chat, ui, ui_chat, ui_default, ui_file_saving, ui_model_menu, ui_notebook, ui_parameters, ui_session, models_settings, training
+from modules import shared, utils, chat, ui, ui_chat, ui_default, ui_file_saving, ui_model_menu, ui_notebook, ui_parameters, ui_session, models_settings, training
 import server
 
-from modules.ui import create_refresh_button, list_interface_input_elements
+from modules.ui import create_refresh_button, list_interface_input_elements, gather_interface_values, save_settings
+from modules.ui_session import set_interface_arguments, get_boolean_arguments
+from modules.github import clone_or_pull_repository
+from modules.utils import gradio as gradiofunc
+
 from .util.ui_helpers import traverse_to
 import os
 import fnmatch
@@ -349,6 +353,7 @@ def get_state_ui_params(state):
             
     return params_list
     
+original_event_handlers = []
     
 # After generating widgets in here, I call this and put them all in shared.gradio and do other supporting things
 def update_shared_gradio_refs(all_widgets):
@@ -387,8 +392,8 @@ def update_shared_gradio_refs(all_widgets):
     # The create_ui thing needs to run during extension tab creation or something
     # Not quite sure how to fix that
     # Right now, session tab ends up in this BHC tab
-    for func in original_create_ui:
-        None # Not running func() currently because it will be placed in the BHC tab
+    # for func in original_create_ui:
+    #     None # Not running func() currently because it will be placed in the BHC tab
         # func()
         
     # Ok, and now I need to call the rest of the UI setup functions, it will be useless without these
@@ -411,9 +416,52 @@ def hijack_list_interface_input_elements():
 def hijack_and_do_nothing():
     # print("test")
     None
+    
+# Because ui_session puts its event handler creation in create_ui, I have to split them apart, I really don't like this
+def hijack_session_create_ui():
+    mu = shared.args.multi_user
+    with gr.Tab("Session", elem_id="session-tab"):
+        with gr.Row():
+            with gr.Column():
+                shared.gradio['reset_interface'] = gr.Button("Apply flags/extensions and restart", interactive=not mu)
+                with gr.Row():
+                    shared.gradio['toggle_dark_mode'] = gr.Button('Toggle 💡')
+                    shared.gradio['save_settings'] = gr.Button('Save UI defaults to settings.yaml', interactive=not mu)
 
+                with gr.Row():
+                    with gr.Column():
+                        shared.gradio['extensions_menu'] = gr.CheckboxGroup(choices=utils.get_available_extensions(), value=shared.args.extensions, label="Available extensions", info='Note that some of these extensions may require manually installing Python requirements through the command: pip install -r extensions/extension_name/requirements.txt', elem_classes='checkboxgroup-table')
+
+                    with gr.Column():
+                        shared.gradio['bool_menu'] = gr.CheckboxGroup(choices=get_boolean_arguments(), value=get_boolean_arguments(active=True), label="Boolean command-line flags", elem_classes='checkboxgroup-table')
+
+            with gr.Column():
+                extension_name = gr.Textbox(lines=1, label='Install or update an extension', info='Enter the GitHub URL below and press Enter. For a list of extensions, see: https://github.com/oobabooga/text-generation-webui-extensions ⚠️  WARNING ⚠️ : extensions can execute arbitrary code. Make sure to inspect their source code before activating them.', interactive=not mu)
+                extension_status = gr.Markdown()
+
+        shared.gradio['theme_state'] = gr.Textbox(visible=False, value='dark' if shared.settings['dark_theme'] else 'light')
+        extension_name.submit(clone_or_pull_repository, extension_name, extension_status, show_progress=False)
+
+            
+def hijack_session_create_event_handlers():
+        # Reset interface event
+        shared.gradio['reset_interface'].click(
+            set_interface_arguments, gradiofunc('extensions_menu', 'bool_menu'), None).then(
+            lambda: None, None, None, _js='() => {document.body.innerHTML=\'<h1 style="font-family:monospace;padding-top:20%;margin:0;height:100vh;color:lightgray;text-align:center;background:var(--body-background-fill)">Reloading...</h1>\'; setTimeout(function(){location.reload()},2500); return []}')
+
+        shared.gradio['toggle_dark_mode'].click(
+            lambda: None, None, None, _js='() => {document.getElementsByTagName("body")[0].classList.toggle("dark")}').then(
+            lambda x: 'dark' if x == 'light' else 'light', gradiofunc('theme_state'), gradiofunc('theme_state'))
+
+        shared.gradio['save_settings'].click(
+            gather_interface_values, gradiofunc(shared.input_elements), gradiofunc('interface_state')).then(
+            save_settings, gradiofunc('interface_state', 'preset_menu', 'extensions_menu', 'show_controls', 'theme_state'), gradiofunc('save_contents')).then(
+            lambda: './', None, gradiofunc('save_root')).then(
+            lambda: 'settings.yaml', None, gradiofunc('save_filename')).then(
+            lambda: gr.update(visible=True), None, gradiofunc('file_saver'))
+            
 def setup():
-    global all_shared_widget_keys, chip_ui_path, original_event_handlers, original_create_ui
+    global all_shared_widget_keys, chip_ui_path, original_event_handlers
     
     # It's time to hijack some functions in the normal webui code so we can hook into the state gathering events
     # However, this makes other parts of the webui code angry, so we have to hijack them too and make them chill awhile
@@ -437,10 +485,6 @@ def setup():
     # Ok, and then all of these functions will break if they run before this extension's ui() function runs
     # So it's time for them to take a little nap until that happens       
  
-    delay_create_ui = [
-        ui_session
-    ]
-
     delay_create_event_handlers = [
         ui_chat, 
         ui_default,
@@ -454,11 +498,12 @@ def setup():
     original_event_handlers = [delay.create_event_handlers for delay in delay_create_event_handlers]
     
     # TODO: I'm not actually calling this anywhere because it puts the created UI inside the BHC tab! I'll keep thinking of a fix
-    original_create_ui = [delay.create_ui for delay in delay_create_ui]
+    # This will construct the session UI in the normal place, so the tab doesn't get displaced
+    # ui_session.create_ui = hijack_and_do_nothing # disabling display of session for now
+    ui_session.create_ui = hijack_session_create_ui
+    # This does the create_event_handlers for session UI, but there's errors here still, figuring it out
+    original_event_handlers.append(hijack_session_create_event_handlers)
     
-    for delay in delay_create_ui:
-        delay.create_ui = hijack_and_do_nothing 
-        
     for delay in delay_create_event_handlers:
         delay.create_event_handlers = hijack_and_do_nothing
     
