@@ -156,6 +156,14 @@ def hijack_gen_single_token(self, gen_settings, prefix_token = None):
 
         logits = self.model.forward(self.sequence_ids[:, -1:], self.cache, loras = self.active_loras).float().cpu()
         
+        if hackingchip:
+            for chip_settings in hackingchip.settings:
+                if chip_settings.logits_settings:
+                    if chip_settings.logits_settings.cfg_func:
+                        logits = chip_settings.logits_settings.cfg_func(logits, chip_settings.logits_settings, hackingchip)
+                    else:
+                        print("cfg_func required")
+        
         if hackingchip and hackingchip.ui_settings['sample_other_prompts']:
             samplerids = self.sequence_ids
         else:
@@ -240,29 +248,7 @@ def hijack_model_forward(self,
 
         x = safe_move_tensor(x, device)
         x = module.forward(x, cache = cache, attn_mask = attn_mask, past_len = past_len, loras = loras, position_offsets = position_offsets)
-        
-        # Moving toward deprecating this, once I have a negative CFG that can do the same result
-        # This does have access to some layer information that the attn layers don't, but not much
-        # If there are no chips that have assigned anything to layer_settings, nothing should happen here
-        if hackingchip:
-            for chip_settings in hackingchip.settings:
-                if chip_settings.layer_settings[idx] != None:
-                    settings = chip_settings.layer_settings[idx]
-                    
-                    if settings.cfg_func:
-                        x = settings.cfg_func(x, settings, hackingchip)
-                        None
-                    else:
-                        print("cfg_func required")
-        
-                    # elif hackingchip.prompts.numneg > 0:
-                    #     x_neg_steering = x[hackingchip.prompts.numpos:hackingchip.prompts.negend]
-                    #     x_neg_steering = torch.mean(x_neg_steering, dim=0, keepdim=False) # probably not the best way to handle this but oh well
-                    #     x_neg_steering = settings.weight * (x_neg_steering - x[0])
-
-                    #     # It's important to steer all of the vectors, or else the difference artificially accumulates and accelerates.
-                    #     x -= x_neg_steering
-                
+                        
         if preprocess_only and idx == self.last_kv_layer_idx:
             x = None
             break

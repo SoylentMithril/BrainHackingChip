@@ -2,7 +2,7 @@
 
 class HackingchipSettings:
     def __init__(self, layer_count, attn_layers):
-        self.layer_settings = [None] * layer_count
+        self.logits_settings = None # layer for affecting logit probabilities
         self.attn_settings = [None] * len(attn_layers)
         
         self.attn_to_layers = attn_layers # Stores the layer index of each attention layer, for conversion from attention layer idx to layer idx
