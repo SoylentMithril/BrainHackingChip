@@ -535,7 +535,7 @@ def ui():
                 gradio['sample_other_prompts'] = gr.Checkbox(label="Debug: Sample Other Prompts", value=False, info='Samples tokens from any extra prompts and prints their output to the console.', visible=False)            
         with gr.Column():
             with gr.Row():
-                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=["default"], label='Settings File', elem_classes='slim-dropdown', multiselect=True, interactive=not mu)  
+                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=["default", "DRUGS"], label='Settings File', elem_classes='slim-dropdown', multiselect=True, interactive=not mu)  
                 create_refresh_button(gradio['file_select'], lambda: None, lambda: {'choices': get_available_files()}, 'refresh-button', interactive=not mu)
             with gr.Row():
                 gradio['save_settings_button'] = gr.Button("Save Settings")
