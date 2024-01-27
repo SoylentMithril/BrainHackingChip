@@ -21,6 +21,36 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
         tensor -= x_neg_steering
       return tensor
     
+    # May switch default to logits?
+    # chip.layer_settings[last_kv_layer - 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
+    # chip.layer_settings[last_kv_layer + 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
+
+    # Default on logits for now to not interfere with drugs
     chip.logits_settings = LayerSettings(weight=weight, cfg_func=cfg_default)
 
+
+
+    # CFG specifically for attention layer vectors
+    # Similar to DRµGS, using the H, Q, K, V, A vectors: https://github.com/EGjoni/DRUGS/blob/main/porting/A%20Guide%20to%20Making%20DRUGS.md
+    
+    # You can do custom cfg_func with Q, K, V as well! It's the exact same function signature (so can use the same function for all if you want)
+    
+    # Uncomment for attention
+    # attn_weight = weight
+    # attn_cfg_func = cfg_default
+    # attn_test = AttnSettings()
+    
+    # Uncomment any of the H, Q, K, V, A lines below (can be used together), also need to set chip.attn_settings so uncommenting here won't do anything alone
+    
+    # attn_test.h = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.q_in = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.k_in = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.v_in = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    # attn_test.a_po = VectorSettings(weight=attn_weight, cfg_func=attn_cfg_func)
+    
+    # Uncomment this to use attn_test
+    # chip.attn_settings = [attn_test] * len(chip.attn_settings) # testing every attention layer
+    
+    
+        
     return chip
