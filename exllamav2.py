@@ -269,7 +269,19 @@ def hijack_model_forward(self,
 
         x = safe_move_tensor(x, device)
         x = module.forward(x, cache = cache, attn_params = attn_params, past_len = past_len, loras = loras)
-                        
+                  
+        # Even if the attention layers feature makes this mostly redundant, it is still useful in various ways
+        if hackingchip:
+            for chip_settings in hackingchip.settings:
+                if chip_settings.layer_settings[idx] != None:
+                    settings = chip_settings.layer_settings[idx]
+                    
+                    if settings.cfg_func:
+                        x = settings.cfg_func(x, settings, hackingchip)
+                        None
+                    else:
+                        print("cfg_func required")
+                                                
         if preprocess_only and idx == self.last_kv_layer_idx:
             x = None
             break
