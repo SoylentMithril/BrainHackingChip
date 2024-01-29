@@ -21,12 +21,11 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
         tensor -= x_neg_steering
       return tensor
     
-    # May switch default to logits?
-    # chip.layer_settings[last_kv_layer - 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
-    # chip.layer_settings[last_kv_layer + 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
+    chip.layer_settings[last_kv_layer - 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
+    chip.layer_settings[last_kv_layer + 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
 
-    # Default on logits for now to not interfere with drugs
-    chip.logits_settings = LayerSettings(weight=weight, cfg_func=cfg_default)
+    # Logits only
+    # chip.logits_settings = LayerSettings(weight=weight, cfg_func=cfg_default)
 
 
 
