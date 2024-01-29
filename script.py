@@ -73,7 +73,7 @@ def make_chip_blocks(mu):
             path = chip_ui_path.format(name=filename)
             temp_chip_ui = importlib.import_module(path)
             css_str = temp_chip_ui.custom_css if hasattr(temp_chip_ui, 'custom_css') else None            
-            with gr.Group(visible=False) as widg_block:
+            with gr.Tab(label=filename,visible=False) as widg_block:
                 if css_str is not None:
                     gr.HTML(f"""<style>{css_str}</style>""")
                 chip_widg_elems, widget_keys, widget_values, ui_components = populate_widgets(temp_chip_ui.ui_params, mu, filename)
@@ -123,22 +123,24 @@ def select_file(filenames):
     for chip_settings_single in chip_settings: importlib.reload(chip_settings_single)
     return update_widget_visibility(filenames)
 
-def update_widget_visibility(filenames, *blockslist):
-    global widget_values, widget_keys, widgets, chipblocks_list, chip_blocks
-    #chip_block_keys = chip_blocks.keys()
+# Gradio doesn't seem to plan on hiding tabs, but maybe I can just leave them all open
+# Gradio doesn't even seem to support renaming tabs, oh well
+def update_widget_visibility(filenames):
     visibility = []
     for chipname, chipinfo in chip_blocks.items():
         if chipname in filenames:
-            visibility.append(gr.update(visible=True))
-            #blockitem.update(visible = True)  
-            blockitem = chipinfo['widg_block']
-            widget_keys = chipinfo['widget_keys']
-            widget_values = chipinfo['widget_values']
-            widgets = chipinfo['chip_widgets']
+            # tab_label = chipname
+            visible = True
         else:
-            visibility.append(gr.update(visible=False))
-    return visibility                 
-    
+            # tab_label = chipname + " (OFF)"
+            visible = False
+            
+        # chipinfo['widg_block'].update(tab_label)
+        # visibility.append(gr.update(label=tab_label, visible=visible))
+        visibility.append(gr.update(visible=visible))
+        
+    return visibility
+
 #A valiant, but ultimately failed attempt at modular interfaces
 def populate_widgets(ui_params, mu, prefix=None):
     count = 0
@@ -250,14 +252,17 @@ def get_chip_params():
 
 settings_path = './extensions/BrainHackingChip/{filename}.json'
 
-def save_settings_click():
+def save_settings_click(filenames):
     global settings_path, chip_blocks
     params = {}
     
     for key, value in chip_blocks.items():
         params[key] = get_widget_params(value['chip_ui'].ui_params)
         
-    settings = {'params': params}
+    settings = {
+        'chips': filenames,
+        'params': params,
+        }
         
     try:
         with open(os.path.join(os.getcwd(), settings_path.format(filename="default_settings")), 'w') as json_file:
@@ -268,7 +273,7 @@ def save_settings_click():
 # From what I know, this should work, not sure what I'm missing
 def load_settings_click(chip_filename):
     # Currently doing global settings, but could do settings for each chip in their own folders too
-    global settings_path, widget_keys, widgets
+    global settings_path
     
     settings = {}
     
@@ -292,6 +297,14 @@ def load_settings_click(chip_filename):
             if 'sub' in info:
                 build_settings_strings(info['sub'], next_prefix)
                 
+    settings_out = []
+        
+    if 'chips' in settings:
+        gradio['file_select'].update(settings['chips'])
+        settings_out.append(gr.update(value=settings['chips']))
+    else:
+        settings_out.append(gr.update())
+                
     if 'params' in settings:
         for chip_name, chip_settings in settings['params'].items():
             build_settings_strings(chip_settings, chip_name)
@@ -303,8 +316,6 @@ def load_settings_click(chip_filename):
     # Adding the above update() call is what got load to update the GUI, not sure how necessary the below part is
     # However, if I try to remove it then things break, so maybe both are needed?
     
-    settings_out = []
-        
     for key, widget in dict_all_chip_widgets.items():
         if key in settings_by_tag:
             settings_out.append(gr.update(value=settings_by_tag[key]))
@@ -312,7 +323,66 @@ def load_settings_click(chip_filename):
             settings_out.append(gr.update())
         
     return settings_out
+            
+# I'm learning gradio with this function, bear with me here
+def ui():
+    global gradio, chip_settings, chipblocks_list
+    mu = shared.args.multi_user    
+    with gr.Row():
+        with gr.Column():
+            with gr.Row():
+                gradio['on_switch'] = gr.Checkbox(label="Activate Brain-Hacking Chip", value=True)
+            with gr.Row():
+                gradio['output_prompts'] = gr.Checkbox(label="Debug: Output Prompts", value=False, info='Print all prompts to the console.')
+                
+                # This isn't working now and I'm not sure why, made it invisible for now
+                gradio['sample_other_prompts'] = gr.Checkbox(label="Debug: Sample Other Prompts", value=False, info='Samples tokens from any extra prompts and prints their output to the console.', visible=False)            
+        with gr.Column():
+            with gr.Row():
+                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=["default"], label='Active Chips', elem_classes='slim-dropdown', multiselect=True, interactive=not mu)  
+                create_refresh_button(gradio['file_select'], lambda: None, lambda: {'choices': get_available_files()}, 'refresh-button', interactive=not mu)
+            with gr.Row():
+                gradio['save_settings_button'] = gr.Button("Save Settings")
+                gradio['load_settings_button'] = gr.Button("Load Settings")
+    
+    with gr.Row():
+        widget_containers_full = make_chip_blocks(mu)
+        
+    gradio['file_select'].change(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)   
+    
+    gradio['on_switch'].change(on_switch_change, gradio['on_switch'])
+    gradio['output_prompts'].change(output_prompts_change, gradio['output_prompts'])
+    gradio['sample_other_prompts'].change(sample_other_prompts_change, gradio['sample_other_prompts'])
+    
+    gradio['save_settings_button'].click(fn=save_settings_click, inputs=gradio['file_select'])
+    
+    # Not sure how to load yet... Have a function that outputs gr.updates for widgets, but the update doesn't happen
+    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=[gradio['file_select']] + list(dict_all_chip_widgets.values()))
+    
+    # Auto-load GUI widgets, will change this to load settings file once that's setup
+    # This solution isn't perfect though, it requires the user to visit the UI first
+    # So if a user has the UI up, closes the backend and restarts it, then interacts with the UI without reloading, the below event will not have triggered
+    shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
+    
+def custom_generate_chat_prompt(user_input, state, **kwargs):
+    global ui_settings, chip_settings
+    
+    ui_params = get_chip_params()
+    
+    chip = importlib.import_module("extensions.BrainHackingChip.chip")
+    importlib.reload(chip)
+    
+    if not chip_settings: # Just in case
+        chip_settings_default = importlib.import_module("extensions.BrainHackingChip.chips.default.chip_settings")
+        importlib.reload(chip_settings_default)
+        chip_settings.append(chip_settings_default)
+        
+    prompt = chip.gen_full_prompt(chip_settings, ui_settings, ui_params, user_input, state, **kwargs)
+    
+    return prompt
 
+
+# Putting this at the bottom of the file:
 
 """ Hopefully won't need this
 all_shared_widget_keys = []
@@ -519,60 +589,3 @@ def setup(): # Changed the name for now to see if the bug persists without this 
     for delay in delay_create_event_handlers:
         delay.create_event_handlers = hijack_and_do_nothing
 """
-            
-# I'm learning gradio with this function, bear with me here
-def ui():
-    global widgets, gradio, chip_settings, chipblocks_list
-    mu = shared.args.multi_user    
-    with gr.Row():
-        with gr.Column():
-            with gr.Row():
-                gradio['on_switch'] = gr.Checkbox(label="Activate Brain-Hacking Chip", value=True)
-            with gr.Row():
-                gradio['output_prompts'] = gr.Checkbox(label="Debug: Output Prompts", value=False, info='Print all prompts to the console.')
-                
-                # This isn't working now and I'm not sure why, made it invisible for now
-                gradio['sample_other_prompts'] = gr.Checkbox(label="Debug: Sample Other Prompts", value=False, info='Samples tokens from any extra prompts and prints their output to the console.', visible=False)            
-        with gr.Column():
-            with gr.Row():
-                gradio['file_select'] = gr.Dropdown(choices=get_available_files(), value=["default", "DRUGS"], label='Settings File', elem_classes='slim-dropdown', multiselect=True, interactive=not mu)  
-                create_refresh_button(gradio['file_select'], lambda: None, lambda: {'choices': get_available_files()}, 'refresh-button', interactive=not mu)
-            with gr.Row():
-                gradio['save_settings_button'] = gr.Button("Save Settings")
-                gradio['load_settings_button'] = gr.Button("Load Settings")
-    
-    with gr.Row():
-        widget_containers_full = make_chip_blocks(mu)
-        
-    gradio['file_select'].change(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)   
-    
-    gradio['on_switch'].change(on_switch_change, gradio['on_switch'])
-    gradio['output_prompts'].change(output_prompts_change, gradio['output_prompts'])
-    gradio['sample_other_prompts'].change(sample_other_prompts_change, gradio['sample_other_prompts'])
-    
-    gradio['save_settings_button'].click(save_settings_click)
-    
-    # Not sure how to load yet... Have a function that outputs gr.updates for widgets, but the update doesn't happen
-    gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=list(dict_all_chip_widgets.values()))
-    
-    # Auto-load GUI widgets, will change this to load settings file once that's setup
-    # This solution isn't perfect though, it requires the user to visit the UI first
-    # So if a user has the UI up, closes the backend and restarts it, then interacts with the UI without reloading, the below event will not have triggered
-    shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
-    
-def custom_generate_chat_prompt(user_input, state, **kwargs):
-    global ui_settings, chip_settings
-    
-    ui_params = get_chip_params()
-    
-    chip = importlib.import_module("extensions.BrainHackingChip.chip")
-    importlib.reload(chip)
-    
-    if not chip_settings: # Just in case
-        chip_settings_default = importlib.import_module("extensions.BrainHackingChip.chips.default.chip_settings")
-        importlib.reload(chip_settings_default)
-        chip_settings.append(chip_settings_default)
-        
-    prompt = chip.gen_full_prompt(chip_settings, ui_settings, ui_params, user_input, state, **kwargs)
-    
-    return prompt

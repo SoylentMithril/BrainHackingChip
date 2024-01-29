@@ -10,6 +10,7 @@ def gen_full_prompt(user_input, state, **kwargs): # This call finds the [[POSITV
 
 def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     weight = ui_params['weight']['attributes']['value']
+    logitsweight = ui_params['logits-weight']['attributes']['value']
     
     def cfg_default(tensor, settings, hackingchip):
       if hackingchip.prompts.numneg > 0:
@@ -25,7 +26,7 @@ def brainhackingchip_settings(chip, params, last_kv_layer, head_layer):
     chip.layer_settings[last_kv_layer + 1] = LayerSettings(weight=weight, cfg_func=cfg_default)
 
     # Logits only
-    # chip.logits_settings = LayerSettings(weight=weight, cfg_func=cfg_default)
+    chip.logits_settings = LayerSettings(weight=logitsweight, cfg_func=cfg_default)
 
 
 
