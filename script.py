@@ -364,8 +364,10 @@ def ui():
     # So if a user has the UI up, closes the backend and restarts it, then interacts with the UI without reloading, the below event will not have triggered
     shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
     
+chip = None
+    
 def custom_generate_chat_prompt(user_input, state, **kwargs):
-    global ui_settings, chip_settings
+    global ui_settings, chip_settings, chip
     
     ui_params = get_chip_params()
     
@@ -381,6 +383,18 @@ def custom_generate_chat_prompt(user_input, state, **kwargs):
     
     return prompt
 
+from modules.text_generation import generate_reply_custom, generate_reply_HF
+
+# chip should always be loaded at this point, right?
+def custom_generate_reply(question, original_question, seed, state, stopping_strings=None, is_chat=False):
+    if chip and shared.model and hasattr(shared.model, 'hackingchip') and hasattr(shared.model.hackingchip, 'custom_generate_reply'):
+        return shared.model.hackingchip.custom_generate_reply(*locals().values())
+    else:
+        # lol I still have to copy and paste ooba code to make this ooba hook work
+        if shared.model.__class__.__name__ in ['LlamaCppModel', 'Exllamav2Model', 'CtransformersModel']:
+            return generate_reply_custom(*locals().values())
+        else:
+            return generate_reply_HF(*locals().values())
 
 # Putting this at the bottom of the file:
 

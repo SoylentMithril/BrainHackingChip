@@ -7,7 +7,7 @@ import torch
 import random
 
 from modules.exllamav2 import Exllamav2Model
-
+from modules.exllamav2_hf import Exllamav2HF
 
 import math
 from torch import nn
@@ -18,6 +18,12 @@ from extensions.BrainHackingChip.hackingchip_classes import Hackingchip, Hacking
 
 # Override functions to inject hackingchip behavior into model loaders. These functions need to be kept up to date with oobabooga's exllamav2
 
+def custom_generate_reply():
+    if shared.model and hasattr(shared.model, 'hackingchip') and hasattr(shared.model.hackingchip, 'custom_generate_reply'):
+        return shared.model.hackingchip.custom_generate_reply
+    else:
+        return None
+    
 # Here is the actual construction and injection of the hackingchip into the model
 
 def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **kwargs):
@@ -33,6 +39,8 @@ def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **
         if shared.model != None:
             if isinstance(shared.model, Exllamav2Model):
                 loader_module_path = "exllamav2"
+            if isinstance(shared.model, Exllamav2HF):
+                loader_module_path = "exllamav2_hf"
                 
         if loader_module_path:
             loader_module = importlib.import_module("extensions.BrainHackingChip.{loader}".format(loader=loader_module_path))
@@ -78,7 +86,7 @@ def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **
             # Should I warn the user that they aren't able to use hackingchip with their current model loader? Or would that be annoying?
             if settings is None: print("Unsupported model loader: Brain-Hacking Chip won't work with it")
             return chat.generate_chat_prompt(user_input, state, **kwargs)
-    else: # Just pass through to default behavior
+    else:
         return chat.generate_chat_prompt(user_input, state, **kwargs)
                         
                     
