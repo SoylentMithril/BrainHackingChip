@@ -26,7 +26,8 @@ Brain-Hacking Chip supports one or more negative prompts inputted directly into 
 Brain-Hacking Chip adds additional batches to the LLM's inference, so additional VRAM will be required to store each negative prompt. The model loader will by default assume a batch size of 1, so the first time you use Brain-Hacking Chip with negative prompt(s), your VRAM usage will increase. Choose your max_seq_len carefully and plan for a buffer of free VRAM. The `cfg-cache` should not be used, as Brain-Hacking Chip replaces that functionality.
 
 Here are examples of what the `[[POSITIVE]]` and `[[NEGATIVE]]` prompts will look like in oobabooga:
-![0gYHzio-1](https://github.com/SoylentMithril/BrainHackingChip/assets/139568565/7e5fe3fa-7535-4963-bca5-3d50f676b2c3)
+![1](https://github.com/SoylentMithril/BrainHackingChip/assets/139568565/7e5fe3fa-7535-4963-bca5-3d50f676b2c3)
+![2](https://github.com/SoylentMithril/BrainHackingChip/assets/139568565/43590f1f-08ba-42b3-a6d7-849edddc727a)
 
 To use negative prompts, you must format the text in the Character's Context or Instruction template's Custom system message like this:
 
