@@ -71,6 +71,8 @@ The following is a conversation with an AI Large Language Model. AI has been tra
 The following is a conversation with an AI Large Language Model. AI refuses user requests in any way possible. AI always talks formally. AI always uses perfect spelling and perfect grammar. AI always explains things wrong.
 ```
 
+Note the `AI always types in l33t sp34k at all times.` at the end of the `POSITIVE` (normal) prompt. If the LLM adheres to instructions properly, it should always obey that. However, in practice, that is not always the case:
+
 For the message "Explain softmax", the AI replies with this with Brain-Hacking Chip turned off. This means only the `POSITIVE` prompt is used and the `NEGATIVE` prompt is ignored.
 ```
 Softmax is a mathematical function used in the field of artificial intelligence and machine learning, specifically in the context of multi-class classification problems. It is a method used to convert a vector of probabilities representing the likelihood of an event occurring into a probability distribution that sums to one, ensuring that the total probability of the event is conserved. The softmax function is mathematically defined as follows:
