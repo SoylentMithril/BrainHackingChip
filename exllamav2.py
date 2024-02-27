@@ -58,6 +58,10 @@ def get_model_info():
     
     return info
 
+def remove_chip():
+    if hasattr(shared.model.generator.model, 'hackingchip'):
+        delattr(shared.model.generator.model, 'hackingchip')
+
 def hijack_loader(hackingchip):    
     shared.model.generator.model.hackingchip = hackingchip # hackingchip installed
     shared.model.model_info = get_model_info()

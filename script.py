@@ -348,6 +348,9 @@ def ui():
     with gr.Row():
         widget_containers_full = make_chip_blocks(mu)
         
+    # TODO: store default values and have a Default Settings button
+    # store the values using the same code as saving, and restore with the default button using load code
+        
     gradio['file_select'].change(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)   
     
     gradio['on_switch'].change(on_switch_change, gradio['on_switch'])
@@ -356,18 +359,25 @@ def ui():
     
     gradio['save_settings_button'].click(fn=save_settings_click, inputs=gradio['file_select'])
     
-    # Not sure how to load yet... Have a function that outputs gr.updates for widgets, but the update doesn't happen
     gradio['load_settings_button'].click(fn=load_settings_click, inputs=gradio['file_select'], outputs=[gradio['file_select']] + list(dict_all_chip_widgets.values()))
     
     # Auto-load GUI widgets, will change this to load settings file once that's setup
     # This solution isn't perfect though, it requires the user to visit the UI first
     # So if a user has the UI up, closes the backend and restarts it, then interacts with the UI without reloading, the below event will not have triggered
+    # Currently in testing and need to add a default button first
+    # shared.gradio['interface'].load(
+    #     fn=load_settings_click, inputs=gradio['file_select'], outputs=[gradio['file_select']] + list(dict_all_chip_widgets.values())).then(
+    #     fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
+
     shared.gradio['interface'].load(fn=select_file, inputs=gradio['file_select'], outputs=chipblocks_list)
     
 chip = None
+generating = False
     
 def custom_generate_chat_prompt(user_input, state, **kwargs):
-    global ui_settings, chip_settings, chip
+    global ui_settings, chip_settings, chip, generating
+    
+    if generating: return user_input # workaround for any potential nested calls
     
     ui_params = get_chip_params()
     
@@ -379,7 +389,11 @@ def custom_generate_chat_prompt(user_input, state, **kwargs):
         importlib.reload(chip_settings_default)
         chip_settings.append(chip_settings_default)
         
+    generating = True
+        
     prompt = chip.gen_full_prompt(chip_settings, ui_settings, ui_params, user_input, state, **kwargs)
+    
+    generating = False
     
     return prompt
 

@@ -83,6 +83,12 @@ def get_model_info():
     
     return info
 
+def remove_chip():
+    if hasattr(shared.model, 'hackingchip'):
+        delattr(shared.model, 'hackingchip')
+    if hasattr(shared.model.ex_model, 'hackingchip'):
+        delattr(shared.model.ex_model, 'hackingchip')
+
 def hijack_loader(hackingchip):
     shared.model.hackingchip = hackingchip # Putting it here too, this might be the main place eventually
     shared.model.ex_model.hackingchip = hackingchip # hackingchip installed

@@ -26,6 +26,28 @@ def custom_generate_reply():
     
 # Here is the actual construction and injection of the hackingchip into the model
 
+def get_loader_module():
+    loader_module_path = None
+    if shared.model != None:
+        if isinstance(shared.model, Exllamav2Model):
+            loader_module_path = "exllamav2"
+        if isinstance(shared.model, Exllamav2HF):
+            loader_module_path = "exllamav2_hf"
+            
+    if loader_module_path:
+        loader_module = importlib.import_module("extensions.BrainHackingChip.{loader}".format(loader=loader_module_path))
+        importlib.reload(loader_module)
+    else:
+        loader_module = None
+        
+    return loader_module
+
+def remove_chip():
+    loader_module = get_loader_module()
+    
+    if loader_module:
+        loader_module.remove_chip()
+
 def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **kwargs):
     def default_gen_full_prompt(user_input, state, **kwargs):
         baseprompt = chat.generate_chat_prompt(user_input, state, **kwargs)
@@ -35,17 +57,9 @@ def gen_full_prompt(user_settings, ui_settings, ui_params, user_input, state, **
     settings = None
     
     if ui_settings['on']:
-        loader_module_path = None
-        if shared.model != None:
-            if isinstance(shared.model, Exllamav2Model):
-                loader_module_path = "exllamav2"
-            if isinstance(shared.model, Exllamav2HF):
-                loader_module_path = "exllamav2_hf"
-                
-        if loader_module_path:
-            loader_module = importlib.import_module("extensions.BrainHackingChip.{loader}".format(loader=loader_module_path))
-            importlib.reload(loader_module)
-            
+        loader_module = get_loader_module()
+        
+        if loader_module:
             baseprompt = None
             for user_settings_single in user_settings:
                 if hasattr(user_settings_single, 'gen_full_prompt'): # Prompt generation override for multiple batches, maybe other things?
