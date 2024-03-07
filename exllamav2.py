@@ -13,6 +13,7 @@ from exllamav2.compat import safe_move_tensor
 from exllamav2 import (
     ExLlamaV2Cache,
     ExLlamaV2Cache_8bit,
+    ExLlamaV2Cache_Q4,
     ExLlamaV2Lora
 )
 from exllamav2.attn import ExLlamaV2Attention
@@ -69,9 +70,11 @@ def hijack_loader(hackingchip):
         # I'm not correctly deleting the existing cache, but it gets removed from VRAM somehow anyway
         
         if shared.args.cache_8bit:
-            shared.model.cache = ExLlamaV2Cache_8bit(shared.model.model, hackingchip.prompts.batch_size)
+            shared.model.cache = ExLlamaV2Cache_8bit(model=shared.model.model, batch_size=hackingchip.prompts.batch_size, lazy=shared.args.autosplit)
+        elif shared.args.cache_4bit:
+            shared.model.cache = ExLlamaV2Cache_Q4(model=shared.model.model, batch_size=hackingchip.prompts.batch_size, lazy=shared.args.autosplit)
         else:
-            shared.model.cache = ExLlamaV2Cache(shared.model.model, hackingchip.prompts.batch_size)
+            shared.model.cache = ExLlamaV2Cache(model=shared.model.model, batch_size=hackingchip.prompts.batch_size, lazy=shared.args.autosplit)
 
         shared.model.generator = ExLlamaV2StreamingGenerator(shared.model.model, shared.model.cache, shared.model.tokenizer)
         
@@ -88,15 +91,18 @@ def hijack_loader(hackingchip):
 # The below functions come from exllamav2, my code is just inserted into them (anything dealing with hackingchip)
 
 # This function only needs to be hijacked because exllamav2 has assertions in here for their CFG that is breaking BHC
-def hijack_begin_stream(self, input_ids: torch.Tensor, gen_settings: ExLlamaV2Sampler.Settings, token_healing = False, loras = None, input_mask = None, position_offsets = None):
+def hijack_begin_stream(self,
+                    input_ids: torch.Tensor,
+                    gen_settings: ExLlamaV2Sampler.Settings,
+                    token_healing = False,
+                    loras = None,
+                    input_mask = None,
+                    position_offsets = None):
 
     # These lines do nothing but cause trouble
     # assert input_ids.shape[0] <= 2, "Streaming generator does not support batch size > 1"
     # if input_ids.shape[0] == 2:
     #     assert gen_settings.cfg_scale is not None, "No CFG scale set"
-    
-    # Considering how BHC replaces CFG, I'm going to just disable whatever CFG stuff exllamav2 is trying here
-    gen_settings.cfg_scale = None
 
     self.position_offsets = position_offsets
     self.input_mask = input_mask
@@ -105,11 +111,21 @@ def hijack_begin_stream(self, input_ids: torch.Tensor, gen_settings: ExLlamaV2Sa
     if loras is not None and isinstance(loras, ExLlamaV2Lora): loras = [loras]
     self.active_loras = loras
 
+    self.no_logits = torch.empty((0, ((self.model.config.vocab_size + 31) // 32) * 32), dtype=torch.float)
+    self.no_tokens = torch.empty((1, 0), dtype=torch.long)
+    self.no_probs = torch.empty((1, 0), dtype=torch.float)
+    self.no_ptokens = torch.empty((1, 0, self.return_top_tokens), dtype=torch.long)
+    self.no_pprobs = torch.empty((1, 0, self.return_top_tokens), dtype=torch.float)
+
     self.held_text = ""
     self.held_utf8_tokens = self.no_tokens
+    self.held_fallback_tokens = self.no_tokens
     self.expect_utf8 = 0
     self.held_tokens = self.no_tokens
+    self.held_ptokens = self.no_ptokens
     self.held_probs = self.no_probs
+    self.held_pprobs = self.no_pprobs
+    self.held_logits = self.no_logits
     self.settings = gen_settings
     self._gen_begin_reuse(input_ids, gen_settings)
 
@@ -207,7 +223,7 @@ def hijack_gen_single_token(self, gen_settings, prefix_token = None):
             logits = logits[0].unsqueeze(0)
             samplerids = self.sequence_ids[0].unsqueeze(0)
         
-        token, prob, eos = ExLlamaV2Sampler.sample(logits, gen_settings, samplerids[:1, :], random.random(), self.tokenizer, prefix_token)
+        token, ptokens, pprobs, prob, eos = ExLlamaV2Sampler.sample(logits, gen_settings, samplerids[:1, :], random.random(), self.tokenizer, prefix_token)
         
         if token.size(0) > 1:
             if hackingchip and hackingchip.ui_settings['sample_other_prompts']:
@@ -219,15 +235,20 @@ def hijack_gen_single_token(self, gen_settings, prefix_token = None):
             token = token[0].unsqueeze(0) # only using the one positive sampled token
         
         # Maybe this if statement isn't necessary and expand won't cause issues?
+        # I think changes in the exllamav2 code means this part isn't necessary anymore
         if hackingchip and hackingchip.prompts.batch_size > 1: batch_token = token.expand(self.sequence_ids.size(0), -1)
 
     else:
 
-        token, prob, eos = self._gen_single_token_speculative(gen_settings, prefix_token)
+        token, ptokens, pprobs, prob, eos, logits = self._gen_single_token_speculative(gen_settings, prefix_token)
+    
+    if self.sequence_ids.shape[0] > 1 and token.shape[0] == 1:
+        self.sequence_ids = torch.cat([self.sequence_ids, token.repeat(self.sequence_ids.shape[0], 1)], dim = 1)
+    else:
+        self.sequence_ids = torch.cat([self.sequence_ids, token], dim = 1)
 
-    self.sequence_ids = torch.cat([self.sequence_ids, batch_token if batch_token is not None else token], dim = 1)
     gen_settings.feed_filters(token)
-    return token, prob, eos
+    return token, ptokens, pprobs, prob, eos, logits.flatten(1)
 
 @torch.inference_mode()
 def hijack_model_forward(self,

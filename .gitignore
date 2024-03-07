@@ -1,5 +1,6 @@
 # Extra
 #chips/
+chips/ext_*/
 default_settings.json
 
 # Byte-compiled / optimized / DLL files

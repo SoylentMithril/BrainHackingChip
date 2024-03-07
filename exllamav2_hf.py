@@ -13,6 +13,7 @@ from exllamav2.compat import safe_move_tensor
 from exllamav2 import (
     ExLlamaV2Cache,
     ExLlamaV2Cache_8bit,
+    ExLlamaV2Cache_Q4,
     ExLlamaV2Lora,
     ExLlamaV2Config,
     ExLlamaV2Tokenizer
@@ -97,9 +98,11 @@ def hijack_loader(hackingchip):
     if hackingchip.prompts.batch_size != shared.model.ex_cache.batch_size: # the hackingchip tends to have extra batches, so it's time to prepare for that
         # I'm not correctly deleting the existing cache, but it gets removed from VRAM somehow anyway
         if shared.args.cache_8bit:
-            shared.model.ex_cache = ExLlamaV2Cache_8bit(shared.model.ex_model, hackingchip.prompts.batch_size)
+            shared.model.ex_cache = ExLlamaV2Cache_8bit(model=shared.model.ex_model, batch_size=hackingchip.prompts.batch_size, lazy=shared.args.autosplit)
+        elif shared.args.cache_4bit:
+            shared.model.ex_cache = ExLlamaV2Cache_Q4(model=shared.model.ex_model, batch_size=hackingchip.prompts.batch_size, lazy=shared.args.autosplit)
         else:
-            shared.model.ex_cache = ExLlamaV2Cache(shared.model.ex_model, hackingchip.prompts.batch_size)
+            shared.model.ex_cache = ExLlamaV2Cache(model=shared.model.ex_model, batch_size=hackingchip.prompts.batch_size, lazy=shared.args.autosplit)
         
     # Hijack functions
     shared.model.ex_model._forward = hijack_model_forward.__get__(shared.model.ex_model, ExLlamaV2)
